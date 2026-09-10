@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "BPD Capture",
+    "slug": "bpd-capture",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.blueprintdigital.bpdcapture",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-video",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "BPD Capture uses the camera to photograph and video job sites for each CE order.",
+          "microphonePermission": "BPD Capture records audio with job videos.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "BPD Capture saves a backup copy of job photos and videos to your gallery.",
+          "savePhotosPermission": "BPD Capture saves a backup copy of job photos and videos to your gallery.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      "expo-sharing",
+      "expo-mail-composer",
+      "react-native-zip-archive"
+    ]
+  }
+}

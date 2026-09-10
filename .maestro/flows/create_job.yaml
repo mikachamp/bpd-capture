@@ -1,0 +1,19 @@
+# Opens the app, creates a new CE job with a client name, and confirms it
+# lands on that job's detail screen. Written as test scaffolding for the
+# Phase 3 plan; NOT run in this dev environment (no Android emulator here —
+# see SESSION_HANDOFF.md's "no emulator" note). Run with:
+#   maestro test .maestro/flows/create_job.yaml
+# against a connected device or emulator with the app already installed.
+appId: com.blueprintdigital.bpdcapture
+---
+- launchApp
+- tapOn: "+ New Order"
+- tapOn: "e.g. CE-2024-0091"
+- inputText: "CE-MAESTRO-0001"
+- tapOn: "e.g. Marcus Reyes"
+- inputText: "Maestro Test Client"
+- tapOn: "e.g. Roof replacement — 14 Ashford Ct"
+- inputText: "Automated flow test job"
+- tapOn: "Open Order"
+- assertVisible: "CE-MAESTRO-0001"
+- assertVisible: "Maestro Test Client"

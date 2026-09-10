@@ -1,0 +1,25 @@
+# Creates a job, navigates into its Job Detail screen, and opens the
+# in-app camera — this is the exact path where the earlier native-only Yoga
+# flex bug (see SESSION_HANDOFF.md) was invisible to web-preview testing but
+# would have failed on a real device. That's the class of bug this flow is
+# meant to catch. Written as test scaffolding for the Phase 3 plan; NOT run
+# in this dev environment (no Android emulator here — see SESSION_HANDOFF.md's
+# "no emulator" note). Run with:
+#   maestro test .maestro/flows/capture_photo.yaml
+# against a connected device or emulator, granting camera/microphone
+# permissions when launchApp requests them below.
+appId: com.blueprintdigital.bpdcapture
+---
+- launchApp:
+    permissions:
+      camera: allow
+      microphone: allow
+- tapOn: "+ New Order"
+- tapOn: "e.g. CE-2024-0091"
+- inputText: "CE-MAESTRO-0002"
+- tapOn: "Open Order"
+- assertVisible: "CE-MAESTRO-0002"
+- tapOn: "📷 Capture"
+- assertVisible: "Photo"
+- assertVisible: "Video"
+- tapOn: "✕ Cancel"
