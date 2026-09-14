@@ -4,7 +4,31 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
-## TL;DR — current state (last updated 2026-09-11, real-device bug-fix round)
+## TL;DR — current state (last updated 2026-09-14, GitHub repo round)
+
+- **This project now has a GitHub remote**: `https://github.com/mikachamp/bpd-capture`
+  (private repo, created via `gh repo create ... --push`). GitHub CLI was installed this
+  round via `winget install --id GitHub.cli --scope user` (no admin needed) — it lives at
+  `C:\Users\mikaw\AppData\Local\Microsoft\WinGet\Packages\GitHub.cli_Microsoft.Winget.Source_8wekyb3d8bbwe\bin\gh.exe`
+  (not yet on `PATH` in this harness's shell sessions — use the full path, or `gh auth
+  setup-git` already wired plain `git push`/`git pull` to work directly too). User is
+  authenticated as `mikachamp` via `gh auth login` (their own browser-based login, same
+  constraint as the still-unresolved EAS login). **`master` is pushed and tracks
+  `origin/master`.**
+- **The APK is distributed via GitHub Releases, not committed into the repo** —
+  deliberate choice to avoid bloating git history with a ~47MB binary on every rebuild
+  (`.gitignore` already excluded `/builds` and `*.apk` from before this round, so this was
+  free). Current release: `v1.0.0` at
+  `https://github.com/mikachamp/bpd-capture/releases/tag/v1.0.0`, asset `bpd2.apk`.
+  **To publish a newer build after a future rebuild**: either `gh release create v1.0.1
+  builds/bpd2.apk --title "..." --notes "..."` (new version tag) or `gh release upload
+  v1.0.0 builds/bpd2.apk --clobber` (replace the same release's asset) — ask the user
+  which they'd prefer before choosing, this wasn't specified.
+- **Google Drive sideloading (the original distribution method) still works and hasn't
+  been replaced** — GitHub Releases is now an additional/alternative way to get the APK
+  onto the phone, not a mandatory switch. Whichever's more convenient for the user is fine.
+
+## TL;DR — current state (2026-09-11, real-device bug-fix round)
 
 - **Three real-device bugs reported via screenshots, all fixed and rebuilt into
   `builds/bpd2.apk`** (each a fast incremental build, no new native deps): (1)
