@@ -33,9 +33,13 @@ function baseName(fileName: string): string {
   return dot > 0 ? fileName.slice(0, dot) : fileName;
 }
 
+const GRID_HORIZONTAL_PADDING = 12;
+
 export function MediaGrid({ media, onRename, onDelete, footer }: Props) {
   const { width } = useWindowDimensions();
   const numColumns = Math.max(2, Math.floor(width / (MIN_THUMB_SIZE + THUMB_GAP)));
+  const thumbSize =
+    (width - GRID_HORIZONTAL_PADDING * 2 - THUMB_GAP * (numColumns - 1)) / numColumns;
   const [previewItem, setPreviewItem] = useState<MediaItem | null>(null);
   const [actionItem, setActionItem] = useState<MediaItem | null>(null);
   const [renameItem, setRenameItem] = useState<MediaItem | null>(null);
@@ -83,7 +87,7 @@ export function MediaGrid({ media, onRename, onDelete, footer }: Props) {
         columnWrapperStyle={styles.row}
         ListFooterComponent={footer}
         renderItem={({ item }) => (
-          <View style={styles.thumbWrapper}>
+          <View style={[styles.thumbWrapper, { width: thumbSize, height: thumbSize }]}>
             <Pressable style={styles.thumbPress} onPress={() => setPreviewItem(item)}>
               {item.type === 'photo' ? (
                 <Image source={{ uri: item.filePath }} style={styles.thumb} resizeMode="cover" />
@@ -191,8 +195,9 @@ const styles = StyleSheet.create({
     gap: THUMB_GAP,
   },
   thumbWrapper: {
-    flex: 1,
-    aspectRatio: 1,
+    // width/height are set inline per-render from the computed thumbSize —
+    // a fixed size (not flex) so a partially-filled last row doesn't stretch
+    // its one or two items to fill the whole row's width.
   },
   thumbPress: {
     flex: 1,

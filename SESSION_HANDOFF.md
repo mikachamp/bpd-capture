@@ -4,15 +4,38 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
-## TL;DR — current state (last updated 2026-09-10, Phase 3 round — IN PROGRESS)
+## TL;DR — current state (last updated 2026-09-11, real-device bug-fix round)
 
+- **Three real-device bugs reported via screenshots, all fixed and rebuilt into
+  `builds/bpd2.apk`** (each a fast incremental build, no new native deps): (1)
+  `MediaGrid.tsx` photo tiles stretched to fill the row when the row wasn't fully
+  populated (a plain flexbox `flex:1`-on-a-partial-row issue, **not** the earlier
+  native-only Yoga bug — this one would have shown in web preview too, it just was never
+  tested with an uneven photo count); (2) exported PDFs (both single-job and daily digest)
+  shared/attached with an unreadable random UUID filename because `expo-print` has no
+  option to name its output — fixed by renaming the file before sharing; (3) "Upload from
+  Gallery" repeatedly triggered Android's "Allow BPD Capture to modify this photo?"
+  prompt — root cause was the app redundantly re-saving a backup copy of an
+  already-in-the-gallery photo back into the gallery on every single upload. See
+  "Follow-up: real-device bug fixes — MediaGrid tile sizing + PDF filenames" and the
+  "Follow-up: gallery-upload permission prompt" section right after it for full details.
+  **Not yet confirmed on the real device** — ask the user to check all three on their S21.
 - **A "Phase 3 Implementation Plan" (Backup & Restore, Maestro E2E testing, EAS OTA
   Updates) was handed to this session externally** (the user pasted it after being asked
-  "what plan?"). Two of its three components are done; the third is blocked on the user.
-  See "Follow-up: Phase 3 — Backup & Restore, Maestro scaffolding, EAS Updates blocked"
-  below for full details. **If resuming mid-build**: check task output for
-  `gradlew.bat assembleRelease` in `C:\dev\bpd\android` — if `BUILD SUCCESSFUL`, copy
-  `C:\dev\bpd\android\app\build\outputs\apk\release\app-release.apk` to `builds/bpd2.apk`.
+  "what plan?"). Backup & Restore and Maestro scaffolding are **done and rebuilt into
+  `builds/bpd2.apk`**; EAS Updates is **deferred, not attempted**, because the user has no
+  Expo account yet. See "Follow-up: Phase 3 — Backup & Restore, Maestro scaffolding, EAS
+  Updates blocked" below for full details.
+- **This repo now has git history.** It had zero commits all session; the user was asked
+  and approved making an initial commit. `master`'s root commit (`80b1bff`) has everything
+  through this Phase 3 round. A `feature/eas-updates` branch was created off it (currently
+  identical to master, no EAS-specific work on it yet) for when EAS setup actually starts —
+  don't add EAS config to `master`, switch to that branch first.
+- **Not yet confirmed on the real device**: Backup export/restore (zip/unzip, DB
+  close-and-replace) is entirely native-only and could only be typechecked +
+  web-preview-verified here. Ask the user to install this build and check: Create Full
+  Backup produces a real `.zip` via the share sheet, and Restore from Backup (picking that
+  same zip back) actually replaces the data after a full app close/reopen.
 - **The app is feature-complete and actively being polished from real-device feedback.**
   All app screens/features described below are done and typechecked. The Android build
   problem (Windows path-length/Ninja bug) is **solved** — see "RESOLVED: local Android
@@ -852,22 +875,106 @@ option was taken on each:
      init/`update:configure` requires an authenticated Expo account, and `npx eas login` is
      an interactive browser-based flow this session cannot run on the user's behalf (same
      constraint noted in the "Distribution note" section elsewhere in this file, from when
-     EAS was considered as a build-blocker fallback and never actually pursued).
-   - **Nothing installed or configured for this component** — no `expo-updates` package
-     added, no `eas.json` changes beyond what already existed, no branch created. This is
-     the one piece of the Phase 3 plan still fully outstanding once the user unblocks it.
-   - `package.json`/`app.json` changes from components 1 and 2 above are already on
-     `master` (no branch was created for any of this round, since Backup/Restore and
-     Maestro scaffolding were never meant to be isolated — only EAS Updates was).
+     EAS was considered as a build-blocker fallback and never actually pursued). **Asked
+     the user directly — they confirmed they don't have an Expo account yet.** Signing up
+     is free at expo.dev, but it's their action to take, not something to route around.
+   - **Resolution**: asked the user whether to make the repo's first commit (see "Git
+     state" below — yes, approved) and separately confirmed they have no Expo account yet.
+     Given no account exists, there is genuinely nothing further to do on the EAS side
+     right now — created an empty `feature/eas-updates` branch off the new initial commit
+     as the isolation point the plan called for, but **deliberately installed nothing and
+     configured nothing on it**: `expo-updates` is a native module, and adding it now would
+     cost another ~20min rebuild for something that can't be configured (no project to
+     link) or verified (nothing to test against) until the user has logged in. Adding it
+     prematurely would also leave `master` and this branch diverged for no real benefit yet.
+   - **Next steps, once the user has an Expo account**: `git checkout feature/eas-updates`,
+     `npx expo install expo-updates`, `npx eas login`, `npx eas init`, `npx eas
+     update:configure` — these inject a real Expo Project ID into `app.json`/`eas.json` and
+     only make sense to run once, with the user actually logged in. Then the usual
+     robocopy-sync + prebuild + rebuild cycle (new native module) applies before this can
+     be tested on-device.
 - **Rebuild**: robocopy-synced the mirror, `npm install` (confirmed both new packages
   added), `npx expo prebuild --platform android --no-install` (regenerated `android/`
-  since two native modules were added), then `./gradlew.bat assembleRelease
-  -PreactNativeArchitectures=arm64-v8a --max-workers=2` — check the TL;DR at the top of
-  this file for how to tell if this finished successfully and what to do next.
+  since two native modules were added), `./gradlew.bat assembleRelease
+  -PreactNativeArchitectures=arm64-v8a --max-workers=2` — `BUILD SUCCESSFUL in 20m 8s`
+  (828 tasks, 796 executed). Copied to `builds/bpd2.apk` (47.6MB, on `master`).
+
+## Follow-up: real-device bug fixes — MediaGrid tile sizing + PDF filenames (2026-09-11)
+
+User sent two real-device screenshots from the S21 after installing the Phase 3 build.
+
+1. **MediaGrid photo tiles rendering giant instead of small** — screenshot showed a job
+   with exactly 1 photo rendering as one huge square filling almost the whole screen
+   width. Root cause, found by reading `src/components/MediaGrid.tsx`: the `thumbWrapper`
+   style used `flex: 1` (so items in a full row split the row width evenly) plus
+   `aspectRatio: 1` (square). Standard flexbox behavior (**identical in both RN Web and
+   native Yoga** — this is not the earlier documented native-only Yoga bug) means a
+   `flex: 1` child in a row that isn't fully populated grows to fill *all* remaining space
+   in that row — with only 1 photo (or any count that doesn't evenly fill `numColumns`),
+   that one item stretched to the full row width, and `aspectRatio: 1` then made it just
+   as tall. This was never caught before because every prior verification round happened
+   to use photo counts that filled full rows exactly. **Fixed**: compute an explicit
+   `thumbSize` (`(width - padding*2 - gap*(numColumns-1)) / numColumns`) and set each
+   tile's `width`/`height` directly instead of relying on `flex: 1` — a partial row now
+   just leaves empty space instead of stretching. Verified via web preview at CE-2024-0075
+   (3 photos, one seeded job with real media in `webMock.ts`) — tiles now render at their
+   correct fixed small size regardless of row fill. **This is a general, not native-only,
+   fix** — safe to trust the web-preview verification fully here.
+2. **Exported PDFs shared with an unreadable filename** — screenshot showed the Android
+   share sheet after "Send Daily Digest" listing the attachment as a random UUID (e.g.
+   `4386be38-445b-4df7-...pdf`). Root cause: `expo-print`'s `Print.printToFileAsync`
+   always writes to an auto-generated UUID-named file in the cache directory — confirmed
+   from its own `Print.types.d.ts` that `FilePrintOptions` has no filename field at all,
+   not assumed. **Fixed**: added `withFriendlyFileName()` in `src/services/reportPdf.ts`,
+   which renames (`File.moveSync`) the freshly-printed file to a real name —
+   `Field-Report-<CE number>.pdf` for the single-job export,
+   `Daily-Digest-<yyyy-MM-dd>.pdf` for the digest — before it's handed to either
+   `Sharing.shareAsync` or `MailComposer.composeAsync`'s `attachments`. Both the share
+   sheet and any mail attachment take their displayed name from the file's actual name on
+   disk, so this fixes the display in both delivery paths, not just the share sheet shown
+   in the screenshot. **Native-only** (expo-print + expo-file-system's synchronous file
+   move) — typechecked clean but not exercised on-device yet.
+- **Rebuild**: both fixes are JS-only (no native dependency changes), so this was the fast
+  incremental path — robocopy-sync, straight to `./gradlew.bat assembleRelease` (no
+  `expo prebuild` needed) — `BUILD SUCCESSFUL in 4m 9s` (828 tasks, 33 executed, 795
+  up-to-date). Copied to `builds/bpd2.apk` (47.6MB).
+- **Not yet committed** — these fixes are sitting as uncommitted changes on `master` on
+  top of the Phase 3 initial commit; ask before committing again, same standing rule as
+  always.
+
+## Follow-up: gallery-upload permission prompt (2026-09-11)
+
+Same feedback round as the two fixes above — a third screenshot showed Android's system
+"Allow BPD Capture to modify this photo?" dialog appearing after tapping "Upload from
+Gallery" on `CE-2024-0088`. Root cause, found in `src/services/storage.ts`:
+`saveCapturedMedia()` is the single function used by **both** the in-app camera
+(`CaptureScreen.tsx`) and gallery uploads (`JobDetailScreen.tsx`'s
+`handleUploadFromGallery`), and it unconditionally calls a `saveToGallery()` step that
+copies the media into a device-gallery "BPD Capture" album via `expo-media-library`. That
+step makes sense for a camera capture (so the photo also lands in the user's normal
+gallery, surviving an app uninstall) but is redundant when the source is **already** a
+gallery photo the user just picked — re-inserting an existing MediaStore-tracked asset
+into a new album is exactly what triggers Android's per-operation "modify" consent dialog,
+once per uploaded file.
+
+**Fixed**: `saveCapturedMedia()` gained an options param, `{ backupToGallery?: boolean }`
+(default `true`, preserving existing camera-capture behavior with zero call-site changes
+needed there). `JobDetailScreen.tsx`'s upload-from-gallery call site now passes
+`{ backupToGallery: false }`. `CaptureScreen.tsx` is untouched — camera captures still get
+their gallery backup exactly as before.
+
+- **Verification**: typechecked clean. This is native-only (`expo-media-library`) and the
+  actual permission-prompt behavior can't be reproduced in web preview — not exercised
+  on-device yet.
+- **Rebuild**: JS-only change, fast incremental path — `BUILD SUCCESSFUL in 31s` (828
+  tasks, 24 executed, 804 up-to-date). Copied to `builds/bpd2.apk` (47.6MB). Not yet
+  committed, same as the two fixes above.
 
 ### Git state
-Nothing has been committed this session (or possibly ever — `git status --short` shows
-every top-level file/folder as untracked `??`, and there's no commit history). The user
-hasn't asked for a commit; don't commit unless asked. **This is now itself an open
-question** — see the EAS Updates blocker just above, which needs the user to decide
-whether to make the first commit.
+This repo had **zero commits for the entire project up to this point** — asked the user
+directly whether to make the first commit given how consequential that felt, and they said
+yes. `master`'s root commit is `80b1bff` ("Initial commit: BPD Capture"), 65 files, everything
+through this Phase 3 round. A `feature/eas-updates` branch exists off that commit (currently
+identical to master) reserved for EAS Updates work once the user has an Expo account — see
+above. The working tree is back on `master` after creating that branch; don't switch to
+`feature/eas-updates` for ordinary app work, only for the EAS-specific steps.

@@ -184,7 +184,7 @@ export function JobDetailScreen({ route, navigation }: Props) {
     try {
       for (const asset of result.assets) {
         const type = asset.type === 'video' ? 'video' : 'photo';
-        const saved = await saveCapturedMedia(order.ceNumber, asset.uri, type);
+        const saved = await saveCapturedMedia(order.ceNumber, asset.uri, type, { backupToGallery: false });
         await addMediaItem(order.id, type, saved.filePath, saved.fileName);
       }
       await reload();

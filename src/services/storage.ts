@@ -42,14 +42,21 @@ export type SavedMedia = {
 
 /**
  * Moves a just-captured photo/video from the camera's temp cache into the
- * app's own CE-numbered folder, and also drops a backup copy into the
- * device's normal Gallery app so the media survives an app uninstall.
+ * app's own CE-numbered folder, and (by default) also drops a backup copy
+ * into the device's normal Gallery app so the media survives an app
+ * uninstall. Pass `backupToGallery: false` for media that's already in the
+ * gallery (e.g. picked via "Upload from Gallery") — re-saving a duplicate
+ * copy of something already there is what triggers Android's repeated
+ * "Allow BPD Capture to modify this photo?" prompt, one per upload.
  */
 export async function saveCapturedMedia(
   ceNumber: string,
   sourceUri: string,
-  type: MediaType
+  type: MediaType,
+  options: { backupToGallery?: boolean } = {}
 ): Promise<SavedMedia> {
+  const { backupToGallery = true } = options;
+
   if (isWeb) {
     return { filePath: sourceUri, fileName: `${type}_${Date.now()}` };
   }
@@ -62,9 +69,11 @@ export async function saveCapturedMedia(
   const sourceFile = new File(sourceUri);
   await sourceFile.copy(destinationFile);
 
-  await saveToGallery(destinationFile.uri).catch((error) => {
-    console.warn('Could not save a gallery backup copy:', error);
-  });
+  if (backupToGallery) {
+    await saveToGallery(destinationFile.uri).catch((error) => {
+      console.warn('Could not save a gallery backup copy:', error);
+    });
+  }
 
   return { filePath: destinationFile.uri, fileName };
 }

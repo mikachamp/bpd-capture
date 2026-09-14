@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as MailComposer from 'expo-mail-composer';
@@ -174,6 +174,20 @@ async function buildDigestHtml(orders: Order[], mediaByOrder: MediaItem[][]): Pr
 }
 
 /**
+ * expo-print always writes its output to a random UUID-named file — there's
+ * no option to control that name — so both the share sheet and any mail
+ * attachment show an unreadable filename unless we rename the file first.
+ */
+function withFriendlyFileName(printedUri: string, desiredFileName: string): string {
+  const renamed = new File(Paths.cache, desiredFileName);
+  if (renamed.exists) {
+    renamed.delete();
+  }
+  new File(printedUri).moveSync(renamed);
+  return renamed.uri;
+}
+
+/**
  * Emails the PDF straight to the saved dispatcher (attachment + recipient
  * pre-filled, no share-sheet chooser) when possible; falls back to the
  * standard Android share sheet when no dispatcher email is saved, or the
@@ -211,7 +225,8 @@ export async function exportAndShareJobReport(order: Order, media: MediaItem[]):
   }
 
   const html = await buildReportHtml(order, media);
-  const { uri } = await Print.printToFileAsync({ html });
+  const { uri: printedUri } = await Print.printToFileAsync({ html });
+  const uri = withFriendlyFileName(printedUri, `Field-Report-${order.ceNumber}.pdf`);
 
   await deliverPdf(uri, {
     dialogTitle: `Share field report — ${order.ceNumber}`,
@@ -233,7 +248,8 @@ export async function exportAndShareDailyDigest(): Promise<{ jobCount: number }>
 
   const mediaByOrder = await Promise.all(orders.map((order) => listMediaForOrder(order.id)));
   const html = await buildDigestHtml(orders, mediaByOrder);
-  const { uri } = await Print.printToFileAsync({ html });
+  const { uri: printedUri } = await Print.printToFileAsync({ html });
+  const uri = withFriendlyFileName(printedUri, `Daily-Digest-${format(now, 'yyyy-MM-dd')}.pdf`);
 
   const dayLabel = format(now, 'MMM d, yyyy');
   await deliverPdf(uri, {
