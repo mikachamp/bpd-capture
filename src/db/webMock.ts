@@ -6,11 +6,12 @@
  * repositories in orders.ts/mediaItems.ts are used instead.
  */
 import { format } from 'date-fns';
-import type { MediaItem, MediaType, Order, OrderStatus } from '../types/models';
+import type { Client, MediaItem, MediaType, Order, OrderStatus } from '../types/models';
 import { normalizeCeNumber } from '../utils/ceNumber';
 
 let nextOrderId = 1;
 let nextMediaId = 1;
+let nextClientId = 1;
 
 function daysAgoIso(days: number): string {
   const date = new Date();
@@ -294,6 +295,49 @@ const mediaItems: MediaItem[] = [
   },
 ];
 
+function coverImageFor(orderId: number): string | null {
+  const photos = mediaItems
+    .filter((m) => m.orderId === orderId && m.type === 'photo')
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return photos[0]?.filePath ?? null;
+}
+
+/** Mirrors the real ORDER_COLUMNS subquery in db/orders.ts so web preview shows the same thumbnails/fallbacks. */
+function withCoverImage(order: Order): Order {
+  return { ...order, coverImage: coverImageFor(order.id) };
+}
+
+function withCoverImages(list: Order[]): Order[] {
+  return list.map(withCoverImage);
+}
+
+const clients: Client[] = [
+  'Marcus Reyes',
+  'Priya Chandran',
+  'Dana Whitfield',
+  'Wei Zhang',
+  'Tom Garrity',
+  'Aaliyah Brooks',
+  'Nadia Ferreira',
+].map((name) => ({ id: nextClientId++, name, createdAt: daysAgoIso(60) }));
+
+export const webClients = {
+  async list(): Promise<Client[]> {
+    return [...clients].sort((a, b) => a.name.localeCompare(b.name));
+  },
+  async add(name: string): Promise<Client> {
+    const existing = clients.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+    const client: Client = { id: nextClientId++, name, createdAt: new Date().toISOString() };
+    clients.push(client);
+    return client;
+  },
+  async remove(id: number): Promise<void> {
+    const index = clients.findIndex((c) => c.id === id);
+    if (index !== -1) clients.splice(index, 1);
+  },
+};
+
 export class DuplicateCeNumberErrorWeb extends Error {}
 
 export const webOrders = {
@@ -321,7 +365,7 @@ export const webOrders = {
       projectName,
     };
     orders.unshift(order);
-    return order;
+    return withCoverImage(order);
   },
   async updateDueDate(id: number, dueDate: string | null): Promise<void> {
     const order = orders.find((o) => o.id === id);
@@ -343,25 +387,35 @@ export const webOrders = {
     order.updatedAt = new Date().toISOString();
   },
   async listWithDueDate(): Promise<Order[]> {
-    return orders
-      .filter((o) => o.dueDate !== null)
-      .sort((a, b) => (a.dueDate as string).localeCompare(b.dueDate as string));
+    return withCoverImages(
+      orders
+        .filter((o) => o.dueDate !== null)
+        .sort((a, b) => (a.dueDate as string).localeCompare(b.dueDate as string))
+    );
   },
   async getById(id: number): Promise<Order | null> {
-    return orders.find((o) => o.id === id) ?? null;
+    const order = orders.find((o) => o.id === id);
+    return order ? withCoverImage(order) : null;
   },
   async getByCe(rawCeNumber: string): Promise<Order | null> {
     const ceNumber = normalizeCeNumber(rawCeNumber);
-    return orders.find((o) => o.ceNumber === ceNumber) ?? null;
+    const order = orders.find((o) => o.ceNumber === ceNumber);
+    return order ? withCoverImage(order) : null;
   },
   async listInProcess(): Promise<Order[]> {
-    return orders.filter((o) => o.status === 'in_process').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return withCoverImages(
+      orders.filter((o) => o.status === 'in_process').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    );
   },
   async listCompletedInRange(startIso: string, endIso: string): Promise<Order[]> {
-    return orders.filter((o) => o.status === 'completed' && o.completedAt && o.completedAt >= startIso && o.completedAt < endIso);
+    return withCoverImages(
+      orders.filter((o) => o.status === 'completed' && o.completedAt && o.completedAt >= startIso && o.completedAt < endIso)
+    );
   },
   async listAllCompleted(): Promise<Order[]> {
-    return orders.filter((o) => o.status === 'completed').sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
+    return withCoverImages(
+      orders.filter((o) => o.status === 'completed').sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))
+    );
   },
   async updateStatus(id: number, status: OrderStatus): Promise<void> {
     const order = orders.find((o) => o.id === id);
@@ -373,12 +427,12 @@ export const webOrders = {
   async search(rawPartial: string): Promise<Order[]> {
     const partial = normalizeCeNumber(rawPartial);
     if (!partial) return [];
-    return orders.filter((o) => o.ceNumber.includes(partial)).slice(0, 25);
+    return withCoverImages(orders.filter((o) => o.ceNumber.includes(partial)).slice(0, 25));
   },
   async searchByClient(rawPartial: string): Promise<Order[]> {
     const partial = rawPartial.trim().toLowerCase();
     if (!partial) return [];
-    return orders.filter((o) => o.clientName?.toLowerCase().includes(partial)).slice(0, 25);
+    return withCoverImages(orders.filter((o) => o.clientName?.toLowerCase().includes(partial)).slice(0, 25));
   },
   async remove(id: number): Promise<void> {
     const index = orders.findIndex((o) => o.id === id);

@@ -1,13 +1,18 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { CompositeScreenProps } from '@react-navigation/native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/types';
+import type { RootStackParamList, MainTabParamList } from '../navigation/types';
 import { getDispatcherContact, setDispatcherContact } from '../db/settings';
 import { exportBackup, importBackup } from '../services/backup';
 import { colors, radius, spacing, typography } from '../theme/theme';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, 'SettingsTab'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 export function SettingsScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
@@ -105,7 +110,18 @@ export function SettingsScreen({ navigation }: Props) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.content}>
-            <Text style={styles.sectionLabel}>Dispatcher Contact</Text>
+            <Text style={styles.sectionLabel}>Clients</Text>
+            <Text style={styles.helperText}>
+              Manage the client names suggested when creating a new job.
+            </Text>
+            <Pressable
+              style={[styles.secondaryButton, styles.fieldSpacing]}
+              onPress={() => navigation.navigate('Clients')}
+            >
+              <Text style={styles.secondaryButtonText}>👥 Manage Clients</Text>
+            </Pressable>
+
+            <Text style={[styles.sectionLabel, styles.sectionSpacing]}>Dispatcher Contact</Text>
             <Text style={styles.helperText}>
               Saved here, field reports and the daily digest are sent straight to this dispatcher —
               email opens pre-addressed with the PDF attached, no share-sheet chooser needed.

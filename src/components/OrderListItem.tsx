@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { format } from 'date-fns';
 import type { Order } from '../types/models';
@@ -11,6 +11,23 @@ type Props = {
   onPress: () => void;
   onDueDateChange?: (dueDate: string | null) => void;
 };
+
+const AVATAR_COLORS = ['#6C5CE7', '#4FC3F7', '#F59E0B', '#EF4444', '#10B981', '#EC4899', '#8B5CF6'];
+
+function initialsFor(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+function colorFor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
 
 export function OrderListItem({ order, onPress, onDueDateChange }: Props) {
   const isCompleted = order.status === 'completed';
@@ -26,6 +43,13 @@ export function OrderListItem({ order, onPress, onDueDateChange }: Props) {
         style={[styles.card, isCompleted ? styles.accentCompleted : styles.accentInProcess, pressStyle]}
       >
       <View style={styles.topRow}>
+        {order.coverImage ? (
+          <Image source={{ uri: order.coverImage }} style={styles.avatarImage} />
+        ) : (
+          <View style={[styles.avatarFallback, { backgroundColor: colorFor(order.clientName || order.ceNumber) }]}>
+            <Text style={styles.avatarFallbackText}>{initialsFor(order.clientName || order.ceNumber)}</Text>
+          </View>
+        )}
         <View style={styles.info}>
           <View style={styles.ceNumberRow}>
             <Text style={styles.ceNumber} numberOfLines={1}>{order.ceNumber}</Text>
@@ -81,6 +105,24 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: spacing.md,
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+  },
+  avatarFallback: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarFallbackText: {
+    color: colors.textOnDark,
+    fontWeight: '700',
+    fontSize: 16,
   },
   info: {
     flex: 1,

@@ -1,13 +1,15 @@
-import { useCallback, useState } from 'react';
-import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState, useMemo } from 'react';
+import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { format } from 'date-fns';
+import type { CompositeScreenProps } from '@react-navigation/native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/types';
-import { listInProcessOrders, updateOrderDueDate } from '../db/orders';
+import type { RootStackParamList, MainTabParamList } from '../navigation/types';
+import { listInProcessOrders, listAllCompletedOrders, updateOrderDueDate } from '../db/orders';
 import { exportAndShareDailyDigest } from '../services/reportPdf';
 import type { Order } from '../types/models';
 import { OrderListItem } from '../components/OrderListItem';
@@ -15,19 +17,25 @@ import { AppLogo } from '../components/AppLogo';
 import { colors, gradientAccent, radius, spacing, typography } from '../theme/theme';
 import { usePressScale } from '../utils/usePressScale';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, 'DashboardTab'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 export function DashboardScreen({ navigation }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSendingDigest, setIsSendingDigest] = useState(false);
+  const [activeTab, setActiveTab] = useState<'in_process' | 'completed'>('in_process');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const reload = useCallback(() => {
     setLoading(true);
-    return listInProcessOrders()
+    const fetcher = activeTab === 'in_process' ? listInProcessOrders : listAllCompletedOrders;
+    return fetcher()
       .then((result) => setOrders(result))
       .finally(() => setLoading(false));
-  }, []);
+  }, [activeTab]);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,6 +73,17 @@ export function DashboardScreen({ navigation }: Props) {
   const overdueCount = orders.filter((o) => o.dueDate && o.dueDate < today).length;
   const newOrderPress = usePressScale();
 
+  const filteredOrders = useMemo(() => {
+    if (!searchQuery) return orders;
+    const lowerQ = searchQuery.toLowerCase();
+    return orders.filter(
+      (o) =>
+        o.ceNumber.toLowerCase().includes(lowerQ) ||
+        (o.clientName && o.clientName.toLowerCase().includes(lowerQ)) ||
+        (o.projectName && o.projectName.toLowerCase().includes(lowerQ))
+    );
+  }, [orders, searchQuery]);
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient colors={[colors.accentTint, colors.background]} style={styles.heroBand}>
@@ -76,70 +95,46 @@ export function DashboardScreen({ navigation }: Props) {
               <Text style={styles.subtitle}>
                 {loading
                   ? 'Loading…'
-                  : `${orders.length} in process${dueThisWeek ? ` · ${dueThisWeek} with a due date` : ''}${
-                      overdueCount ? ` · ${overdueCount} overdue` : ''
-                    }`}
+                  : activeTab === 'in_process' 
+                    ? `${orders.length} active${dueThisWeek ? ` · ${dueThisWeek} with due date` : ''}${overdueCount ? ` · ${overdueCount} overdue` : ''}`
+                    : `${orders.length} completed`}
               </Text>
             </View>
-            <Pressable style={styles.headerIconButton} onPress={() => navigation.navigate('Insights')} hitSlop={8}>
-              <Text style={styles.headerIconText}>📊</Text>
+          </View>
+          
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by CE, Client, or Project..."
+              placeholderTextColor={colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+
+          <View style={styles.segmentContainer}>
+            <Pressable 
+              style={[styles.segmentTab, activeTab === 'in_process' && styles.segmentTabActive]} 
+              onPress={() => { setActiveTab('in_process'); setSearchQuery(''); }}
+            >
+              <Text style={[styles.segmentTabText, activeTab === 'in_process' && styles.segmentTabTextActive]}>In Process</Text>
             </Pressable>
-            <Pressable style={styles.headerIconButton} onPress={() => navigation.navigate('Calendar')} hitSlop={8}>
-              <Text style={styles.headerIconText}>📅</Text>
-            </Pressable>
-            <Pressable style={styles.headerIconButton} onPress={() => navigation.navigate('Settings')} hitSlop={8}>
-              <Text style={styles.headerIconText}>⚙️</Text>
+            <Pressable
+              style={[styles.segmentTab, activeTab === 'completed' && styles.segmentTabActive]}
+              onPress={() => { setActiveTab('completed'); setSearchQuery(''); }}
+            >
+              <Text style={[styles.segmentTabText, activeTab === 'completed' && styles.segmentTabTextActive]}>Completed</Text>
             </Pressable>
           </View>
 
-          <View style={styles.actions}>
-            <Pressable
-              onPress={() => navigation.navigate('NewOrder')}
-              onPressIn={newOrderPress.onPressIn}
-              onPressOut={newOrderPress.onPressOut}
-            >
-              <Animated.View style={newOrderPress.style}>
-                <LinearGradient
-                  colors={gradientAccent}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.actionButton, styles.actionButtonFull, styles.primaryAction]}
-                >
-                  <Text style={styles.primaryActionText}>+ New Order</Text>
-                </LinearGradient>
-              </Animated.View>
-            </Pressable>
-            <View style={styles.actionsPairRow}>
-              <Pressable style={styles.actionButton} onPress={() => navigation.navigate('SearchByCe')}>
-                <Text style={styles.actionButtonText}>Search by CE</Text>
-              </Pressable>
-              <Pressable style={styles.actionButton} onPress={() => navigation.navigate('SearchByClient')}>
-                <Text style={styles.actionButtonText}>Search by Client</Text>
-              </Pressable>
-            </View>
-            <Pressable
-              style={[styles.actionButton, styles.actionButtonFull]}
-              onPress={() => navigation.navigate('BrowseByDate')}
-            >
-              <Text style={styles.actionButtonText}>Browse Completed</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.actionButton, styles.actionButtonFull]}
-              onPress={handleSendDigest}
-              disabled={isSendingDigest}
-            >
-              <Text style={styles.actionButtonText}>
-                {isSendingDigest ? 'Preparing digest…' : '📨 Send Daily Digest'}
-              </Text>
-            </Pressable>
-          </View>
-
-          <Text style={styles.sectionLabel}>In Process</Text>
+          <Text style={styles.listHeading}>
+            {activeTab === 'in_process' ? 'Active Jobs' : 'Completed Jobs'}
+          </Text>
         </View>
       </LinearGradient>
 
       <FlatList
-        data={orders}
+        data={filteredOrders}
         keyExtractor={(item) => String(item.id)}
         style={styles.list}
         contentContainerStyle={styles.listContent}
@@ -150,14 +145,46 @@ export function DashboardScreen({ navigation }: Props) {
             onDueDateChange={(dueDate) => handleDueDateChange(item.id, dueDate)}
           />
         )}
+        ListHeaderComponent={
+          activeTab === 'completed' ? (
+            <View style={{ paddingHorizontal: spacing.xl, paddingBottom: spacing.md }}>
+              <Pressable
+                style={[styles.actionButton, styles.actionButtonFull]}
+                onPress={handleSendDigest}
+                disabled={isSendingDigest}
+              >
+                <Text style={styles.actionButtonText}>
+                  {isSendingDigest ? 'Preparing digest…' : '📨 Send Daily Digest'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           !loading ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyText}>No orders in process. Tap "+ New Order" to start one.</Text>
+              <Text style={styles.emptyText}>
+                {searchQuery 
+                  ? "No matching orders found."
+                  : activeTab === 'in_process' 
+                    ? 'No orders in process. Tap "+" to start one.' 
+                    : 'No completed orders found.'}
+              </Text>
             </View>
           ) : null
         }
       />
+      
+      <Pressable
+        style={styles.fab}
+        onPress={() => navigation.navigate('NewOrder')}
+        onPressIn={newOrderPress.onPressIn}
+        onPressOut={newOrderPress.onPressOut}
+      >
+        <Animated.View style={newOrderPress.style}>
+          <Text style={styles.fabText}>+</Text>
+        </Animated.View>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -181,7 +208,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.md,
   },
   headerText: {
     flex: 1,
@@ -193,27 +220,49 @@ const styles = StyleSheet.create({
     ...typography.caption,
     marginTop: 2,
   },
-  headerIconButton: {
-    width: 44,
-    height: 44,
+  searchContainer: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  searchInput: {
+    backgroundColor: colors.surface,
+    color: colors.textPrimary,
     borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  segmentContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  segmentTab: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    borderRadius: radius.sm,
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  headerIconText: {
-    fontSize: 20,
+  segmentTabActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
-  actions: {
-    gap: spacing.sm,
+  segmentTabText: {
+    ...typography.label,
+    color: colors.textSecondary,
+  },
+  segmentTabTextActive: {
+    color: colors.textOnDark,
+  },
+  listHeading: {
+    ...typography.label,
     paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  actionsPairRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+    paddingTop: spacing.sm,
   },
   actionButton: {
     flex: 1,
@@ -235,19 +284,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
   },
-  primaryAction: {
-    borderWidth: 0,
-  },
-  primaryActionText: {
-    fontWeight: '700',
-    color: colors.textOnDark,
-    fontSize: 13,
-  },
-  sectionLabel: {
-    ...typography.label,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.sm,
-  },
   list: {
     width: '100%',
     maxWidth: 720,
@@ -255,7 +291,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flexGrow: 1,
-    paddingBottom: spacing.xl,
+    // Clears the floating + button (64px tall, sitting spacing.lg above the
+    // bottom edge) so it never overlaps the last card in the list.
+    paddingBottom: 64 + spacing.lg * 2,
   },
   empty: {
     padding: spacing.xxl,
@@ -265,5 +303,26 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  fab: {
+    position: 'absolute',
+    bottom: spacing.lg,
+    right: spacing.lg,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  fabText: {
+    fontSize: 32,
+    color: colors.textOnDark,
+    lineHeight: 36,
   },
 });

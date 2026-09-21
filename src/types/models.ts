@@ -12,6 +12,14 @@ export type Order = {
   notes: string | null;
   clientName: string | null;
   projectName: string | null;
+  /** The order's first photo (by capture order), for list-row thumbnails. Not a stored column — computed by a subquery in every listing/search query in db/orders.ts. */
+  coverImage?: string | null;
+};
+
+export type Client = {
+  id: number;
+  name: string;
+  createdAt: string;
 };
 
 export type MediaType = 'photo' | 'video';

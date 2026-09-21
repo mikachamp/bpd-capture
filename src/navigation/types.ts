@@ -1,12 +1,19 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
+export type MainTabParamList = {
+  DashboardTab: undefined;
+  CalendarTab: { initialMode?: 'month' | 'week' } | undefined;
+  InsightsTab: undefined;
+  SettingsTab: undefined;
+};
+
 export type RootStackParamList = {
-  Dashboard: undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList>;
   NewOrder: undefined;
   JobDetail: { orderId: number };
   Capture: { orderId: number; ceNumber: string };
   BrowseByDate: undefined;
   SearchByCe: undefined;
   SearchByClient: undefined;
-  Calendar: { initialMode?: 'month' | 'week' } | undefined;
-  Insights: undefined;
-  Settings: undefined;
+  Clients: undefined;
 };

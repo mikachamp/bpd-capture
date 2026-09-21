@@ -3,15 +3,20 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { differenceInCalendarDays, format } from 'date-fns';
+import type { CompositeScreenProps } from '@react-navigation/native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/types';
+import type { RootStackParamList, MainTabParamList } from '../navigation/types';
 import { listAllCompletedOrders, listInProcessOrders } from '../db/orders';
 import type { Order } from '../types/models';
 import { StatTile } from '../components/StatTile';
 import { Meter } from '../components/Meter';
 import { colors, radius, spacing, typography } from '../theme/theme';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Insights'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, 'InsightsTab'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 const todayKey = () => format(new Date(), 'yyyy-MM-dd');
 const daysFromTodayKey = (days: number) => {
@@ -58,9 +63,6 @@ export function InsightsScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.centered}>
           <View style={styles.header}>
-            <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
-              <Text style={styles.backLink}>‹ Dashboard</Text>
-            </Pressable>
             <Text style={styles.title}>Insights</Text>
           </View>
 
@@ -76,7 +78,7 @@ export function InsightsScreen({ navigation }: Props) {
               label="Due this week"
               value={String(dueThisWeekCount)}
               tone={dueThisWeekCount > 0 ? 'warning' : 'neutral'}
-              onPress={() => navigation.navigate('Calendar', { initialMode: 'week' })}
+              onPress={() => navigation.navigate('CalendarTab', { initialMode: 'week' })}
             />
             <StatTile label="Avg. turnaround" value={avgTurnaround ? `${avgTurnaround}d` : '—'} hint="Opened to completed" />
           </View>

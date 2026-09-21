@@ -6,6 +6,21 @@ import { DuplicateCeNumberErrorWeb, webOrders } from './webMock';
 
 const isWeb = Platform.OS === 'web';
 
+/**
+ * Every query that returns Order rows selects this instead of a plain `*`,
+ * so `order.coverImage` (the first photo captured for the job, used by
+ * OrderListItem's thumbnail) is populated consistently everywhere an Order
+ * can end up rendered — not just on the two screens a first pass might
+ * think of. Missing one of these means a job with photos shows its
+ * thumbnail on some screens and an initials fallback on others, for no
+ * reason a user could explain.
+ */
+const ORDER_COLUMNS = `orders.*, (
+  SELECT filePath FROM media_items mi
+  WHERE mi.orderId = orders.id AND mi.type = 'photo'
+  ORDER BY mi.createdAt ASC LIMIT 1
+) AS coverImage`;
+
 export class DuplicateCeNumberError extends Error {
   constructor(public ceNumber: string) {
     super(`An order for CE number "${ceNumber}" already exists.`);
@@ -96,7 +111,7 @@ export async function listOrdersWithDueDate(): Promise<Order[]> {
   if (isWeb) return webOrders.listWithDueDate();
   const db = await getDb();
   return db.getAllAsync<Order>(
-    `SELECT * FROM orders WHERE dueDate IS NOT NULL ORDER BY dueDate ASC`
+    `SELECT ${ORDER_COLUMNS} FROM orders WHERE dueDate IS NOT NULL ORDER BY dueDate ASC`
   );
 }
 
@@ -110,21 +125,21 @@ export async function deleteOrder(id: number): Promise<void> {
 export async function getOrderById(id: number): Promise<Order | null> {
   if (isWeb) return webOrders.getById(id);
   const db = await getDb();
-  return db.getFirstAsync<Order>(`SELECT * FROM orders WHERE id = ?`, id);
+  return db.getFirstAsync<Order>(`SELECT ${ORDER_COLUMNS} FROM orders WHERE id = ?`, id);
 }
 
 export async function getOrderByCe(rawCeNumber: string): Promise<Order | null> {
   const ceNumber = normalizeCeNumber(rawCeNumber);
   if (isWeb) return webOrders.getByCe(ceNumber);
   const db = await getDb();
-  return db.getFirstAsync<Order>(`SELECT * FROM orders WHERE ceNumber = ?`, ceNumber);
+  return db.getFirstAsync<Order>(`SELECT ${ORDER_COLUMNS} FROM orders WHERE ceNumber = ?`, ceNumber);
 }
 
 export async function listInProcessOrders(): Promise<Order[]> {
   if (isWeb) return webOrders.listInProcess();
   const db = await getDb();
   return db.getAllAsync<Order>(
-    `SELECT * FROM orders WHERE status = 'in_process' ORDER BY createdAt DESC`
+    `SELECT ${ORDER_COLUMNS} FROM orders WHERE status = 'in_process' ORDER BY createdAt DESC`
   );
 }
 
@@ -132,7 +147,7 @@ export async function listCompletedOrdersInRange(startIso: string, endIso: strin
   if (isWeb) return webOrders.listCompletedInRange(startIso, endIso);
   const db = await getDb();
   return db.getAllAsync<Order>(
-    `SELECT * FROM orders WHERE status = 'completed' AND completedAt >= ? AND completedAt < ? ORDER BY completedAt DESC`,
+    `SELECT ${ORDER_COLUMNS} FROM orders WHERE status = 'completed' AND completedAt >= ? AND completedAt < ? ORDER BY completedAt DESC`,
     startIso,
     endIso
   );
@@ -142,7 +157,7 @@ export async function listAllCompletedOrders(): Promise<Order[]> {
   if (isWeb) return webOrders.listAllCompleted();
   const db = await getDb();
   return db.getAllAsync<Order>(
-    `SELECT * FROM orders WHERE status = 'completed' ORDER BY completedAt DESC`
+    `SELECT ${ORDER_COLUMNS} FROM orders WHERE status = 'completed' ORDER BY completedAt DESC`
   );
 }
 
@@ -166,7 +181,7 @@ export async function searchByCe(rawPartial: string): Promise<Order[]> {
   if (isWeb) return webOrders.search(partial);
   const db = await getDb();
   return db.getAllAsync<Order>(
-    `SELECT * FROM orders WHERE ceNumber LIKE ? ORDER BY createdAt DESC LIMIT 25`,
+    `SELECT ${ORDER_COLUMNS} FROM orders WHERE ceNumber LIKE ? ORDER BY createdAt DESC LIMIT 25`,
     `%${partial}%`
   );
 }
@@ -177,7 +192,7 @@ export async function searchByClient(rawPartial: string): Promise<Order[]> {
   if (isWeb) return webOrders.searchByClient(partial);
   const db = await getDb();
   return db.getAllAsync<Order>(
-    `SELECT * FROM orders WHERE clientName LIKE ? ORDER BY createdAt DESC LIMIT 25`,
+    `SELECT ${ORDER_COLUMNS} FROM orders WHERE clientName LIKE ? ORDER BY createdAt DESC LIMIT 25`,
     `%${partial}%`
   );
 }

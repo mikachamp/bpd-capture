@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS clients (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  createdAt TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_media_orderId ON media_items(orderId);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_completedAt ON orders(completedAt);

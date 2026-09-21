@@ -1,9 +1,11 @@
-import { useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { createOrder, DuplicateCeNumberError, getOrderByCe } from '../db/orders';
+import { addClient, listClients } from '../db/clients';
+import type { Client } from '../types/models';
 import { isValidCeNumber } from '../utils/ceNumber';
 import { DueDateChip } from '../components/DueDateChip';
 import { colors, radius, spacing, typography } from '../theme/theme';
@@ -16,6 +18,20 @@ export function NewOrderScreen({ navigation }: Props) {
   const [projectName, setProjectName] = useState('');
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  useEffect(() => {
+    listClients().then(setClients);
+  }, []);
+
+  const clientSuggestions = useMemo(() => {
+    const query = clientName.trim().toLowerCase();
+    if (!query) return [];
+    return clients
+      .filter((c) => c.name.toLowerCase().includes(query) && c.name.toLowerCase() !== query)
+      .slice(0, 5);
+  }, [clients, clientName]);
 
   const handleCreate = async () => {
     if (!isValidCeNumber(ceNumber)) {
@@ -26,6 +42,12 @@ export function NewOrderScreen({ navigation }: Props) {
     setSubmitting(true);
     try {
       const order = await createOrder({ ceNumber, dueDate, clientName, projectName });
+      const trimmedClient = clientName.trim();
+      if (trimmedClient) {
+        // Fire-and-forget: new client names are saved for future autocomplete
+        // suggestions without blocking navigation into the new job.
+        addClient(trimmedClient).catch(() => {});
+      }
       navigation.replace('JobDetail', { orderId: order.id });
     } catch (error) {
       if (error instanceof DuplicateCeNumberError) {
@@ -63,6 +85,7 @@ export function NewOrderScreen({ navigation }: Props) {
             <TextInput
               value={ceNumber}
               onChangeText={setCeNumber}
+              onFocus={() => setShowSuggestions(false)}
               placeholder="e.g. CE-2024-0091"
               autoCapitalize="characters"
               placeholderTextColor={colors.textMuted}
@@ -75,18 +98,39 @@ export function NewOrderScreen({ navigation }: Props) {
             <Text style={[styles.label, styles.fieldSpacing]}>Client Name</Text>
             <TextInput
               value={clientName}
-              onChangeText={setClientName}
+              onChangeText={(text) => {
+                setClientName(text);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
               placeholder="e.g. Marcus Reyes"
               placeholderTextColor={colors.textMuted}
               autoCorrect={false}
               style={styles.input}
               returnKeyType="next"
             />
+            {showSuggestions && clientSuggestions.length > 0 && (
+              <View style={styles.suggestionsBox}>
+                {clientSuggestions.map((client) => (
+                  <Pressable
+                    key={client.id}
+                    style={styles.suggestionRow}
+                    onPress={() => {
+                      setClientName(client.name);
+                      setShowSuggestions(false);
+                    }}
+                  >
+                    <Text style={styles.suggestionText}>{client.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
 
             <Text style={[styles.label, styles.fieldSpacing]}>Project Name</Text>
             <TextInput
               value={projectName}
               onChangeText={setProjectName}
+              onFocus={() => setShowSuggestions(false)}
               placeholder="e.g. Roof replacement — 14 Ashford Ct"
               placeholderTextColor={colors.textMuted}
               autoCorrect={false}
@@ -137,6 +181,24 @@ const styles = StyleSheet.create({
   },
   fieldSpacing: {
     marginTop: spacing.sm,
+  },
+  suggestionsBox: {
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  suggestionRow: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  suggestionText: {
+    color: colors.textPrimary,
+    fontSize: 15,
   },
   input: {
     borderWidth: 1,

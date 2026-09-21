@@ -3,15 +3,20 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { addMonths, addWeeks, format, isToday, subMonths, subWeeks } from 'date-fns';
+import type { CompositeScreenProps } from '@react-navigation/native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../navigation/types';
+import type { RootStackParamList, MainTabParamList } from '../navigation/types';
 import { listOrdersWithDueDate } from '../db/orders';
 import type { Order } from '../types/models';
 import { buildWeekDays } from '../utils/calendarGrid';
 import { MonthCalendarBoard } from '../components/MonthCalendarBoard';
 import { colors, radius, spacing, typography } from '../theme/theme';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Calendar'>;
+type Props = CompositeScreenProps<
+  BottomTabScreenProps<MainTabParamList, 'CalendarTab'>,
+  NativeStackScreenProps<RootStackParamList>
+>;
 type ViewMode = 'month' | 'week';
 
 const today = new Date(new Date().toDateString());
@@ -47,9 +52,6 @@ export function CalendarScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.container}>
       <View style={styles.centered}>
         <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
-            <Text style={styles.backLink}>‹ Dashboard</Text>
-          </Pressable>
           <Text style={styles.title}>Calendar</Text>
         </View>
 

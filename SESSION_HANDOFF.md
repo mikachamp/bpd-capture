@@ -4,8 +4,16 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
-## TL;DR — current state (last updated 2026-09-14, GitHub repo round)
+## TL;DR — current state (last updated 2026-09-22, Clients + UX-restructure round)
 
+- **Two rounds of external "Gemini" implementation plans landed this round, both reviewed
+  and handled by this session**: (1) a bottom-tab UX restructure (Home/Calendar/Insights/
+  Settings tabs, unified search, segmented In Process/Completed, FAB) — reviewed and
+  verified, found 2 real bugs (FAB overlapping list content; dead "‹ Dashboard" links on
+  Calendar/Insights left over from the pre-tab structure) — **both now fixed** as part of
+  this round; (2) a "Clients List & Dashboard Visuals" plan — this one was **implemented
+  directly by this session** (not Gemini) after review, since the user said to go ahead.
+  See "Follow-up: Clients List & Dashboard Visuals" below for full details.
 - **This project now has a GitHub remote**: `https://github.com/mikachamp/bpd-capture`
   (private repo, created via `gh repo create ... --push`). GitHub CLI was installed this
   round via `winget install --id GitHub.cli --scope user` (no admin needed) — it lives at
@@ -993,6 +1001,120 @@ their gallery backup exactly as before.
 - **Rebuild**: JS-only change, fast incremental path — `BUILD SUCCESSFUL in 31s` (828
   tasks, 24 executed, 804 up-to-date). Copied to `builds/bpd2.apk` (47.6MB). Not yet
   committed, same as the two fixes above.
+
+## Follow-up: Gemini's bottom-tab UX restructure — reviewed, 2 bugs fixed (2026-09-22)
+
+The user pasted a "UX Restructure Implementation Plan" from Gemini (bottom tabs replacing
+the old unlabeled 📊/📅/⚙️ header icons, a unified search bar replacing separate Search-by-
+CE/Search-by-Client buttons, a segmented In Process/Completed toggle replacing the old
+"Browse Completed" navigation, a FAB replacing the header "+ New Order" button). User's
+explicit role assignment for this one: **wait for Gemini to implement it, then this session
+reviews/verifies/rebuilds** — a different division of labor than the PDF/Backup features
+earlier in this doc, which this session built directly.
+
+- **Watched the working tree** (a 10-minute `git status`/`git diff --stat` poll loop) while
+  Gemini implemented: `RootNavigator.tsx`/`types.ts` restructured into
+  `MainTabParamList` (DashboardTab/CalendarTab/InsightsTab/SettingsTab) nested inside the
+  existing `RootStackParamList` stack (NewOrder/JobDetail/Capture/BrowseByDate/SearchByCe/
+  SearchByClient stay top-level stack routes) — correctly typed throughout via
+  `CompositeScreenProps<BottomTabScreenProps<MainTabParamList, '...'>,
+  NativeStackScreenProps<RootStackParamList>>` on every migrated screen.
+- **Full review pass** once Gemini finished: typechecked clean, zero console errors,
+  Playwright walkthrough at both phone (390×844) and tablet-landscape (1180×820) covering
+  every tab, the search bar, the segmented toggle, the Insights→Calendar-week deep link, and
+  the FAB→New Order flow.
+- **Found 2 real bugs, both now fixed** (rolled into the same round as the Clients feature
+  below, single rebuild covers both):
+  1. **FAB overlapped list content** — `DashboardScreen.tsx`'s `listContent` had only
+     `paddingBottom: spacing.xl` (20px), nowhere near enough to clear the 64px FAB sitting
+     `spacing.lg` (16px) above the screen's bottom edge — the last visible card's content
+     was genuinely covered, not just the normal "FAB floats over content while scrolling"
+     behavior every app has. Fixed: `paddingBottom: 64 + spacing.lg * 2` (96px), enough to
+     fully clear the FAB once scrolled to the true end of the list.
+  2. **Dead "‹ Dashboard" back-links on `CalendarScreen.tsx` and `InsightsScreen.tsx`** —
+     leftover from when these were stack-pushed screens; now that they're persistent bottom
+     tabs (reached by tapping the tab bar, not by pushing), `navigation.goBack()` had no
+     back-history to go to, and the link implied a parent/child relationship with Home that
+     no longer exists. `SettingsScreen.tsx` (also migrated to a tab) correctly never had
+     this link — confirmed it was an oversight, not a design choice. Fixed: removed the
+     back-link `Pressable`/`Text` from both screens' headers, keeping just the screen title.
+- Everything else (search, segmented toggle, cross-tab deep link, tablet layout) was
+  correct as Gemini built it — no other changes made to the restructure itself.
+
+## Follow-up: Clients List & Dashboard Visuals — implemented directly (2026-09-22)
+
+A second Gemini-authored plan ("Clients List & Dashboard Visuals") was pasted in the same
+session. Reviewed it first (see the review notes in-conversation — not duplicated here in
+full, but the gist: `clients` table has no FK to `orders.clientName` so it's a pure
+autocomplete-suggestion list, not a real relational link; "update queries" undersold needing
+all 8 Order-returning functions in `db/orders.ts`, not just 2; a 5th bottom tab felt crowded
+next to the already-4-tab bar from the round above; "update the heading" was ambiguous about
+whether it replaced app branding). User said to implement it — **this session built it
+directly** (not Gemini), resolving each open point as noted:
+
+- **`src/db/schema.ts`**: new `clients` table (`id`, `name UNIQUE`, `createdAt`) — no
+  migration entry needed, same reasoning as the pre-existing `settings` table (new table,
+  not a new column).
+- **`src/types/models.ts`**: new `Client` type; `Order` gained an optional `coverImage`
+  field with a comment noting it's computed by a subquery, not a stored column.
+- **`src/db/clients.ts`** (new): `listClients()`/`addClient()` (`INSERT OR IGNORE`, so
+  re-adding an existing name is a harmless no-op)/`deleteClient()`. Deliberately **does not**
+  touch `orders.clientName` on delete — removing a client only affects future autocomplete
+  suggestions, never rewrites existing job data. Both real-SQLite and `webMock.ts` (new
+  `webClients` store, seeded with the 7 distinct client names already used in the mock
+  orders) paths implemented.
+- **`src/db/orders.ts`**: added a shared `ORDER_COLUMNS` SQL fragment (`orders.*` plus a
+  correlated subquery for the order's first photo, ordered by `createdAt ASC`) and applied
+  it to **all 8** functions that return `Order`/`Order[]` — `listInProcessOrders`,
+  `listCompletedOrdersInRange`, `listAllCompletedOrders`, `listOrdersWithDueDate`,
+  `getOrderById`, `getOrderByCe`, `searchByCe`, `searchByClient` — specifically to avoid the
+  "thumbnail on Dashboard but blank fallback on Search results for the same job"
+  inconsistency the original plan's narrower 2-function scope would have caused.
+  `webMock.ts` mirrors this via a `withCoverImage`/`withCoverImages` helper applied at every
+  `webOrders` return point, so web preview shows the same thumbnails/fallbacks.
+- **`src/components/OrderListItem.tsx`**: 48×48 rounded thumbnail on the left of each card;
+  falls back to a colorful initials circle (deterministic color from a simple string hash
+  over `AVATAR_COLORS`, so the same client always gets the same color) when there's no
+  `coverImage`. Verified: real photos, other-clients'-initials, and no-client-name (falls
+  back to CE number's initials) all render correctly.
+- **`src/screens/ClientsScreen.tsx`** (new): add-a-client input + list with per-row Remove
+  (destructive-confirm not used here since removal is non-destructive to job data — a plain
+  tap is enough, unlike deleting a whole job). Registered as a **top-level stack route**
+  (`Clients` in `RootStackParamList`), **not a 5th bottom tab** — reachable via a new
+  "👥 Manage Clients" row added to `SettingsScreen.tsx`. This was a judgment call flagged
+  explicitly to the user during review (low-frequency "manage a list occasionally" action
+  competing for a scarce tab slot); no objection was raised, so it shipped this way — easy
+  to move to its own tab later if that turns out wrong.
+- **`src/screens/NewOrderScreen.tsx`**: Client Name field gained a live autocomplete —
+  suggestions render **inline below the field** (not absolutely positioned), deliberately,
+  to avoid the ScrollView-clipping/z-index issues an absolute-positioned dropdown risks
+  inside a `keyboardShouldPersistTaps="handled"` ScrollView. Typing filters `listClients()`
+  results client-side (substring match, excludes an exact match, capped at 5). Selecting a
+  suggestion fills the field and closes the dropdown; the other two fields close it via
+  `onFocus`. On successful order creation, a non-empty client name is fire-and-forget
+  `addClient()`-saved (auto-save default from the plan's own "Open Questions" section,
+  which the user didn't override) — doesn't block navigation into the new job.
+- **`src/screens/DashboardScreen.tsx`**: added an "Active Jobs"/"Completed Jobs" label above
+  the list (resolving the plan's ambiguity by **adding** a section heading rather than
+  replacing the "BPD Capture" branding title, which stays untouched).
+- **Verification**: typechecked clean; full Playwright pass — thumbnails, initials fallback,
+  autocomplete dropdown + selection, Clients screen list/add all confirmed working with zero
+  console errors. The one real photo in the seed data (`CE-2024-0075`, via picsum.photos)
+  rendered as a blank box in the sandboxed test browser — same known no-internet-access
+  limitation hit earlier this session with MediaGrid, not a code defect; the 48×48
+  sizing/rounding around it was confirmed correct.
+- **Rebuild**: combined with the FAB/back-link fixes above into one build attempt — **first
+  attempt failed**: `Unable to resolve module @react-navigation/bottom-tabs`. Root cause:
+  that package was added to `package.json` by Gemini's earlier tab-restructure round, but
+  this session never ran `npm install` in the `C:\dev\bpd` mirror since before that round
+  landed (robocopy deliberately excludes `node_modules`, so a new JS dependency needs an
+  explicit `npm install` in the mirror even though it needs no `expo prebuild` — no native
+  code, so nothing else was affected). Fixed with `npm install` in `C:\dev\bpd` (confirmed
+  "added 1 package"), then `BUILD SUCCESSFUL in 1m 28s`. Copied to `builds/bpd2.apk`
+  (47.6MB). **Lesson for next time**: after a batch of source changes lands from an
+  external source (Gemini or otherwise) without going through this session's own
+  `npx expo install`, diff `package.json` against the mirror's `node_modules` before
+  assuming "JS-only, skip npm install" — don't rely on "no native module" alone to skip it.
 
 ### Git state
 This repo had **zero commits for the entire project up to this point** — asked the user
