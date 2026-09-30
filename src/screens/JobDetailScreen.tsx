@@ -250,12 +250,12 @@ export function JobDetailScreen({ route, navigation }: Props) {
       <View style={styles.content}>
         <View style={styles.header}>
           <TextInput
-            value={ceNumberDraft}
-            onChangeText={setCeNumberDraft}
-            onBlur={handleCeNumberBlur}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            style={styles.ceNumberInput}
+            value={projectNameDraft}
+            onChangeText={setProjectNameDraft}
+            onBlur={handleClientInfoBlur}
+            placeholder="Add project name"
+            placeholderTextColor={colors.textMuted}
+            style={styles.projectNameInput}
           />
           <Text style={styles.timestamps}>
             Opened {format(new Date(order.createdAt), 'MMM d, yyyy')}
@@ -263,23 +263,23 @@ export function JobDetailScreen({ route, navigation }: Props) {
           </Text>
 
           <View style={styles.clientField}>
+            <Text style={styles.fieldLabel}>CE Number</Text>
+            <TextInput
+              value={ceNumberDraft}
+              onChangeText={setCeNumberDraft}
+              onBlur={handleCeNumberBlur}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              style={styles.fieldInput}
+            />
+          </View>
+          <View style={styles.clientField}>
             <Text style={styles.fieldLabel}>Client Name</Text>
             <TextInput
               value={clientNameDraft}
               onChangeText={setClientNameDraft}
               onBlur={handleClientInfoBlur}
               placeholder="Add client name"
-              placeholderTextColor={colors.textMuted}
-              style={styles.fieldInput}
-            />
-          </View>
-          <View style={styles.clientField}>
-            <Text style={styles.fieldLabel}>Project Name</Text>
-            <TextInput
-              value={projectNameDraft}
-              onChangeText={setProjectNameDraft}
-              onBlur={handleClientInfoBlur}
-              placeholder="Add project name"
               placeholderTextColor={colors.textMuted}
               style={styles.fieldInput}
             />
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.md,
   },
-  ceNumberInput: {
+  projectNameInput: {
     ...typography.display,
     padding: 0,
     borderBottomWidth: StyleSheet.hairlineWidth,

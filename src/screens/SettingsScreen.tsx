@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList, MainTabParamList } from '../navigation/types';
 import { getDispatcherContact, setDispatcherContact } from '../db/settings';
-import { exportBackup, importBackup } from '../services/backup';
+import { exportBackup, importBackup, isBackupPasswordProtected, pickBackupFile } from '../services/backup';
 import {
   backupThenDownloadAndInstall,
   checkForUpdate,
@@ -29,6 +29,9 @@ export function SettingsScreen({ navigation }: Props) {
   const [isRestoringBackup, setIsRestoringBackup] = useState(false);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
+  const [passwordPromptMode, setPasswordPromptMode] = useState<'export' | 'restore' | null>(null);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [pendingRestoreUri, setPendingRestoreUri] = useState<string | null>(null);
 
   useEffect(() => {
     getDispatcherContact().then((contact) => {
@@ -44,17 +47,10 @@ export function SettingsScreen({ navigation }: Props) {
     setTimeout(() => setJustSaved(false), 1200);
   };
 
-  const handleExportBackup = async () => {
-    if (Platform.OS === 'web') {
-      Alert.alert(
-        'Not available in web preview',
-        'Backup export reads the database and media files directly off the device and only works in the installed Android app.'
-      );
-      return;
-    }
+  const runExport = async (password?: string) => {
     setIsExportingBackup(true);
     try {
-      await exportBackup();
+      await exportBackup(password || undefined);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not create a backup. Please try again.';
       Alert.alert('Backup failed', message);
@@ -63,25 +59,48 @@ export function SettingsScreen({ navigation }: Props) {
     }
   };
 
-  const runRestore = async () => {
-    setIsRestoringBackup(true);
-    try {
-      const outcome = await importBackup();
-      if (outcome === 'restored') {
-        Alert.alert(
-          'Backup restored',
-          'Your data has been replaced with the backup. Close BPD Capture completely and reopen it for the restored data to show up.'
-        );
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not restore this backup. Please try again.';
-      Alert.alert('Restore failed', message);
-    } finally {
-      setIsRestoringBackup(false);
+  const handleExportBackup = () => {
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        'Not available in web preview',
+        'Backup export reads the database and media files directly off the device and only works in the installed Android app.'
+      );
+      return;
     }
+    setPasswordInput('');
+    setPasswordPromptMode('export');
   };
 
-  const handleImportBackup = () => {
+  const runRestore = (uri: string, password?: string) => {
+    Alert.alert(
+      'Restore from backup?',
+      "This replaces every job, photo, and video currently on this device with what's in the backup file. This cannot be undone.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Restore',
+          style: 'destructive',
+          onPress: async () => {
+            setIsRestoringBackup(true);
+            try {
+              await importBackup(uri, password || undefined);
+              Alert.alert(
+                'Backup restored',
+                'Your data has been replaced with the backup. Close BPD Capture completely and reopen it for the restored data to show up.'
+              );
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Could not restore this backup. Please try again.';
+              Alert.alert('Restore failed', message);
+            } finally {
+              setIsRestoringBackup(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleImportBackup = async () => {
     if (Platform.OS === 'web') {
       Alert.alert(
         'Not available in web preview',
@@ -89,14 +108,39 @@ export function SettingsScreen({ navigation }: Props) {
       );
       return;
     }
-    Alert.alert(
-      'Restore from backup?',
-      'This replaces every job, photo, and video currently on this device with what\'s in the backup file. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Restore', style: 'destructive', onPress: runRestore },
-      ]
-    );
+    try {
+      const uri = await pickBackupFile();
+      if (!uri) return;
+      const protectedFile = await isBackupPasswordProtected(uri);
+      if (protectedFile) {
+        setPasswordInput('');
+        setPendingRestoreUri(uri);
+        setPasswordPromptMode('restore');
+      } else {
+        runRestore(uri);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not read this backup file. Please try again.';
+      Alert.alert('Restore failed', message);
+    }
+  };
+
+  const closePasswordPrompt = () => {
+    setPasswordPromptMode(null);
+    setPasswordInput('');
+    setPendingRestoreUri(null);
+  };
+
+  const submitPasswordPrompt = () => {
+    const mode = passwordPromptMode;
+    const password = passwordInput;
+    const restoreUri = pendingRestoreUri;
+    closePasswordPrompt();
+    if (mode === 'export') {
+      runExport(password);
+    } else if (mode === 'restore' && restoreUri) {
+      runRestore(restoreUri, password);
+    }
   };
 
   const runUpdate = async (update: UpdateInfo) => {
@@ -248,6 +292,44 @@ export function SettingsScreen({ navigation }: Props) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <Modal visible={passwordPromptMode !== null} transparent animationType="fade" onRequestClose={closePasswordPrompt}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.passwordBackdrop}>
+          <View style={styles.passwordSheet}>
+            <Text style={styles.passwordTitle}>
+              {passwordPromptMode === 'export' ? 'Protect this backup? (optional)' : 'This backup is password-protected'}
+            </Text>
+            <Text style={styles.helperText}>
+              {passwordPromptMode === 'export'
+                ? "Set a password to encrypt the backup, or leave blank to create it without one."
+                : 'Enter the password it was created with to restore it.'}
+            </Text>
+            <TextInput
+              value={passwordInput}
+              onChangeText={setPasswordInput}
+              placeholder="Password"
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={[styles.input, styles.fieldSpacing]}
+              onSubmitEditing={submitPasswordPrompt}
+              returnKeyType="done"
+              autoFocus
+            />
+            <View style={styles.passwordButtonRow}>
+              <Pressable style={styles.passwordCancelButton} onPress={closePasswordPrompt}>
+                <Text style={styles.passwordCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.passwordSubmitButton} onPress={submitPasswordPrompt}>
+                <Text style={styles.passwordSubmitText}>
+                  {passwordPromptMode === 'export' ? 'Create Backup' : 'Restore'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -329,5 +411,50 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
     paddingHorizontal: spacing.sm,
+  },
+  passwordBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(20,22,28,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  passwordSheet: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
+  passwordTitle: {
+    ...typography.subtitle,
+  },
+  passwordButtonRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  passwordCancelButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+  },
+  passwordCancelText: {
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  passwordSubmitButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+  },
+  passwordSubmitText: {
+    fontWeight: '700',
+    color: colors.textOnDark,
   },
 });

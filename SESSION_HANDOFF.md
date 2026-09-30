@@ -4,7 +4,34 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
-## TL;DR — current state (last updated 2026-10-01, in-app update-check round)
+## TL;DR — current state (last updated 2026-10-01, real-device feedback round)
+
+- **Two user-reported issues fixed from testing the v1.1.0 build on the S21**: (1) Job
+  Detail's CE Number field had no visible label (easy to mistake for something else — the
+  user actually renamed a job's CE number to "PUT IN" by typing into it without realizing
+  what it was) and Project Name wasn't the prominent field despite that being the card
+  heading on Dashboard/Search — fixed by making Project Name the big hero heading on Job
+  Detail (matching the list-card hierarchy) and giving CE Number an explicit "CE Number"
+  label, demoted to a small field alongside Client Name. (2) Backup/Restore had no password
+  protection (one of the two items flagged in the security review) — added optional
+  password encryption via `react-native-zip-archive`'s already-installed
+  `zipWithPassword`/`unzipWithPassword`, with a small in-app password-prompt modal on both
+  export and restore (restore only prompts if the picked file is actually
+  password-protected, checked via `isPasswordProtected()`). **The other flagged security
+  item — replacing the shared debug keystore — was deliberately deferred**, since doing it
+  in the same release meant to test the update-checker would change the signing
+  certificate and break Android's "this is a legitimate update" check entirely, forcing a
+  full uninstall and data loss. See "Follow-up: real-device fixes" below for full details.
+- **New troubleshooting note**: hit a genuinely new failure mode this round — Metro's web
+  bundler got into a corrupted state serving `(1 module)` bundles instead of the real app
+  (rendered as a blank white page, zero console errors, looked like an infra problem not a
+  code bug) after several rounds of repeated dev-server restarts/requests. Fixed with a
+  full restart using `--clear` to wipe the bundler cache. Logged as a new failure mode
+  alongside the existing stray-process slowdown note — check the bundle's own
+  `(N modules)` log line after warming, not just the HTTP status code, before trusting a
+  "it's ready" signal.
+
+## TL;DR — current state (2026-10-01, in-app update-check round)
 
 - **New feature: Settings → "Check for Updates"**, checking the public GitHub repo's
   releases for a newer version, backing up data first, then downloading and handing off to
@@ -1365,6 +1392,76 @@ a web search on `react-native-zip-archive`'s CVE history — not asserted from m
   could get this app to offer installing whatever they attached. Recommended 2FA on that
   account if not already enabled; this is a process/account recommendation, not something
   fixable in code.
+
+## Follow-up: real-device fixes from testing v1.1.0 (2026-10-01)
+
+User installed `v1.1.0` on their S21 and reported two things back, both fixed this round.
+
+1. **CE Number/Project Name hierarchy on Job Detail.** `src/screens/JobDetailScreen.tsx`
+   previously showed CE Number as the big unlabeled hero field at top (a holdover from
+   before CE editing existed at all), with Client Name/Project Name as small labeled fields
+   below — inconsistent with the Dashboard/Search cards, which already show Project Name as
+   the heading (from the earlier `OrderListItem` change). Confirmed concretely broken, not
+   just a style nitpick: the user typed into the unlabeled hero field thinking it was
+   something else, and it silently renamed a real job's CE number to "PUT IN". Fixed:
+   swapped the layout so **Project Name is now the hero field** (`styles.projectNameInput`,
+   still editable, same large `typography.display` styling the old CE Number field had) and
+   **CE Number moved down into a small labeled field** (`fieldLabel` "CE Number", same
+   pattern as Client Name) right below the timestamps line. No logic changed — `ceNumberDraft`/
+   `handleCeNumberBlur` and the rename/folder-move/media-path-rewrite behavior from the
+   previous round are untouched, only the JSX order and which style each `TextInput` uses.
+2. **Backup/Restore password protection** (one of the two items flagged in the prior
+   security review, now built). `src/services/backup.ts`:
+   - `exportBackup(password?)` — uses `zipWithPassword()` instead of `zip()` when a
+     password is supplied, otherwise unchanged. Both already came from
+     `react-native-zip-archive`, already installed — no new dependency, no native rebuild
+     step needed beyond the usual incremental one.
+   - **Restructured restore from one function into three**, so the caller can check for a
+     password before deciding whether to prompt for one: `pickBackupFile()` (just the
+     `DocumentPicker` step, returns the URI or `null` on cancel), `isBackupPasswordProtected(uri)`
+     (wraps `isPasswordProtected()`), and `importBackup(uri, password?)` (the actual
+     extract-and-replace logic, now takes an already-picked URI instead of picking
+     internally). This is a breaking change to `importBackup`'s signature — grep for other
+     callers before assuming this is the only call site if picking this back up later (it
+     wasn't, as of this round — `SettingsScreen.tsx` is the only caller and was updated
+     alongside).
+   - `src/screens/SettingsScreen.tsx`: new reusable password-prompt `Modal` (shared between
+     export and restore via a `passwordPromptMode: 'export' | 'restore' | null` state) —
+     export always shows it with password optional (blank = unencrypted, preserving the old
+     one-tap behavior for anyone who doesn't want this); restore only shows it when
+     `isBackupPasswordProtected()` says the picked file actually needs one, otherwise
+     restores directly. The destructive "Restore from backup?" confirm `Alert` now fires
+     *after* the password step (reordered from before this round, when picking and
+     extracting happened in one call) — more sensible ordering, since you now confirm the
+     destructive action only once you're holding a file that's actually about to work.
+   - **Verification**: typechecked clean. The modal's actual on-screen appearance could
+     **not** be screenshotted in web preview — tapping "Create Full Backup" hits the
+     existing `Platform.OS === 'web'` guard (same as every other native-only feature) and
+     shows the graceful fallback alert *before* the modal would ever open, by design. This
+     is a real limitation of web preview for this feature, not a bug — trust the typecheck
+     + code review for the modal itself, not a screenshot, same caveat as camera
+     capture/PDF export always carried.
+   - **Deliberately not done this round**: the release-keystore swap (the other flagged
+     security item) — see the TL;DR at the top of this file for exactly why, and do not
+     bundle it into a release meant for update-check testing without a fresh backup taken
+     first and the user's explicit go-ahead that they understand the next install will
+     require a full uninstall.
+- **New Metro-corruption troubleshooting note** (worth its own callout, cost real time this
+  round): after several rounds of dev-server restarts, Metro's web bundler started serving
+  `Web Bundled ... index.ts (1 module)` instead of the real `(1500ish modules)` bundle —
+  page loaded to a completely blank white screen, zero console errors, looked exactly like
+  an infrastructure/timing problem rather than a bundling bug. Confirmed via the dev
+  server's own log line (`grep`-checking the module count, not just the HTTP status code of
+  a warming `curl`, which returned 200 throughout and was actively misleading). **Fixed by a
+  full restart with `--clear`** (`npx expo start --web --port 8098 --clear`), which wipes
+  Metro's bundler cache. This is now a second known root cause for "the app renders
+  blank/broken in web preview for no obvious reason," alongside the existing stray-process
+  slowdown note earlier in this file — check the actual module count in the dev server's
+  log after warming the bundle, not just that a request returned 200, before trusting the
+  app is actually ready to test.
+- **Rebuild**: JS-only, fast incremental path — check the TL;DR at the top of this file for
+  the outcome if resuming mid-build. Version bumped to `1.2.0` in `app.json` for this
+  release, per the established "bump on every release" rule from the update-check feature.
 
 ### Git state
 This repo had **zero commits for the entire project up to this point** — asked the user
