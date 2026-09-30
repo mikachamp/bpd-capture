@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
-import { zip, unzip } from 'react-native-zip-archive';
+import { listContents, zip, unzip } from 'react-native-zip-archive';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { format } from 'date-fns';
@@ -70,6 +70,25 @@ export async function exportBackup(): Promise<void> {
   }
 }
 
+/**
+ * react-native-zip-archive (and archive extractors generally) have a real,
+ * recurring history of "zip-slip" path-traversal bugs — a malicious entry
+ * name like `../../../../somewhere/else` can make extraction write outside
+ * the intended destination. Restore accepts an arbitrary user-picked file,
+ * so it can't assume the archive is trustworthy just because it opens.
+ * Checked here via the library's own listing, before any bytes are
+ * extracted — not a guarantee the native extractor is itself bug-free, but
+ * it rejects the entire well-known attack class up front.
+ */
+async function assertNoUnsafeZipEntries(source: string): Promise<void> {
+  const entries = await listContents(source);
+  for (const entry of entries) {
+    if (entry.path.startsWith('/') || entry.path.split(/[/\\]/).includes('..')) {
+      throw new Error('This backup file contains unsafe file paths and was not restored.');
+    }
+  }
+}
+
 export type RestoreOutcome = 'restored' | 'cancelled';
 
 /**
@@ -93,6 +112,7 @@ export async function importBackup(): Promise<RestoreOutcome> {
 
   const staging = freshStagingDirectory('bpd_restore_staging');
   try {
+    await assertNoUnsafeZipEntries(picked.assets[0].uri);
     await unzip(picked.assets[0].uri, staging.uri);
 
     const restoredDb = new File(staging, DB_FILE_NAME);

@@ -4,7 +4,28 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
-## TL;DR — current state (last updated 2026-10-01, CE-edit + heading-swap round)
+## TL;DR — current state (last updated 2026-10-01, in-app update-check round)
+
+- **New feature: Settings → "Check for Updates"**, checking the public GitHub repo's
+  releases for a newer version, backing up data first, then downloading and handing off to
+  Android's installer. **Two architectural decisions made this round, both with the user's
+  explicit sign-off**: (1) `bpd-capture` is now a **public** repo (was private) — required
+  so the app can query GitHub's release API without embedding an auth token in the
+  distributed APK, which would be trivially extractable and therefore not actually secret;
+  (2) `app.json`'s `version` is bumped to `1.1.0` and **must keep being bumped on every
+  future release that should be update-checkable** — this whole feature only works by
+  comparing version numbers, and `1.0.0` had never once changed across dozens of rebuilds
+  this session. **Also changed as of this round: stop clobber-uploading every build to the
+  same `v1.0.0` GitHub release — create a new incrementing tag per release from now on**
+  (this round's release is `v1.1.0`), or the update-check will never see anything as
+  "newer." See "Follow-up: in-app Check for Updates" below for full details, including why
+  a truly silent/automatic install is impossible on Android for a sideloaded app. **Not yet
+  confirmed on the real device** — this is the one feature this session where even the
+  basic mechanism (native `expo-application`/`expo-intent-launcher` calls, the actual
+  install hand-off) is completely unverifiable in web preview; ask the user to test the
+  whole flow for real once this build is installed.
+
+## TL;DR — current state (2026-10-01, CE-edit + heading-swap round)
 
 - **Three user-reported gaps fixed, rebuilt into `builds/bpd2.apk`, committed and pushed**:
   (1) CE Number was the one field on Job Detail with no edit option — now editable, with the
@@ -1199,6 +1220,151 @@ directly by this session (no Gemini involved this round):
   Dashboard with the updated CE number reflected on the card, zero console errors.
 - **Rebuild**: JS-only, fast incremental path — `BUILD SUCCESSFUL in 5m 50s`. Copied to
   `builds/bpd2.apk` (47.6MB).
+
+## Follow-up: in-app "Check for Updates" (2026-10-01)
+
+User asked for the app to check GitHub for updates and prompt to install, then — mid-turn,
+while this was being scoped — added that current data must be backed up before any update
+proceeds. Both requirements are satisfied together in one flow, reusing the existing backup
+feature rather than building a second one.
+
+- **Two new native dependencies**: `expo-application` (reads the installed app's real
+  version via `Application.nativeApplicationVersion`, matching whatever `app.json`'s
+  `version` was at build time — confirmed from its own `.d.ts`, not assumed) and
+  `expo-intent-launcher` (`IntentLauncher.startActivityAsync(action, params)` — a generic
+  Android intent launcher; confirmed its `activityAction` param accepts any raw string, not
+  just its own `ActivityAction` enum, which is what makes launching `android.intent.action.
+  VIEW` on a downloaded APK possible). Neither needed a config plugin entry in `app.json`
+  (no "Added config plugin" message on install, confirmed no plugins array changes needed).
+  **Full prebuild + rebuild cycle** (new native modules) — this time remembered to run
+  `npm install` in the `C:\dev\bpd` mirror **and** `npx expo prebuild` before building,
+  applying the lesson from the previous round's build failure.
+- **New permission**: `android.permission.REQUEST_INSTALL_PACKAGES` added via `app.json`'s
+  `android.permissions` array (Expo's plain-permission mechanism, no plugin needed) —
+  confirmed present in the generated `AndroidManifest.xml` after prebuild, not just assumed
+  from the config.
+- **New `src/services/appUpdate.ts`**:
+  - `checkForUpdate()`: hits `https://api.github.com/repos/mikachamp/bpd-capture/releases/
+    latest` (public, unauthenticated — see the repo-visibility decision in the TL;DR above),
+    compares its `tag_name` (stripped of a leading `v`) against `Application.
+    nativeApplicationVersion` via plain dotted-numeric comparison, returns `null` if already
+    current, otherwise the release's `.apk` asset URL. Throws a friendly error if the
+    release has no APK attached, or the network request fails. Web-guarded like every other
+    native-only feature in this app.
+  - `backupThenDownloadAndInstall(update)`: calls the **existing** `exportBackup()` from
+    `services/backup.ts` first — literally the same function Settings' "Create Full Backup"
+    button already calls — **unconditionally, every time, before any download starts**, per
+    the explicit requirement that data must be saved before an update proceeds. Then
+    downloads the APK via `File.downloadFileAsync` into the cache directory, and launches
+    the install via `IntentLauncher.startActivityAsync('android.intent.action.VIEW', { data:
+    downloadedFile.contentUri, flags: 1 /* FLAG_GRANT_READ_URI_PERMISSION */, type:
+    'application/vnd.android.package-archive' })`.
+  - **Important, honest limitation, stated plainly rather than glossed over**: `exportBackup()`
+    ends in `Sharing.shareAsync(...)`, opening Android's share sheet so the user picks where
+    the backup zip goes. Whether the user actually completes that share (vs. dismissing it)
+    can't be detected from the API — Android doesn't distinguish "cancelled" from
+    "completed" for a generic `ACTION_SEND` the way it does for the install intent's result
+    code. The code's guarantee is "the backup zip was created and the user was prompted to
+    save it somewhere," not "the user definitely saved it" — worth knowing if this is ever
+    represented to the user as a stronger guarantee than it is.
+  - `openInstallPermissionSettings()`: a fallback, offered via an "Open Settings" button in
+    the failure alert, that opens Android's `MANAGE_UNKNOWN_APP_SOURCES` settings screen
+    scoped to this app — only needed if the install intent itself throws (modern Android
+    generally has its own Package Installer UI prompt for this permission as part of
+    handling the `ACTION_VIEW` intent, so this is a safety net, not the primary path).
+- **`SettingsScreen.tsx`**: new "App Updates" section (current version + "🔄 Check for
+  Updates" button) below Data Backup. Three states: checking → "already up to date" alert
+  (shows current version) → or an update-available alert offering "Back Up & Update" (backs
+  up, downloads, launches install) vs. Cancel.
+- **Why a truly silent "auto-update" isn't possible, stated to the user up front rather than
+  discovered after building the wrong thing**: Android requires explicit user confirmation
+  through its own Package Installer UI before installing any APK, sideloaded or not — no app
+  can replace itself silently, regardless of what permissions it holds. "Check → prompt →
+  back up → download → hand off to Android's installer, where you tap Install" is the
+  ceiling for this platform, not a limitation of this implementation.
+- **Repo housekeeping that came with this feature, not optional if you want it to keep
+  working**: `bpd-capture` was switched from private to public (`gh repo edit ... --
+  visibility public`), and the GitHub release workflow changed from "clobber-upload to
+  `v1.0.0` forever" to "create a new incrementing tag per release" — `app.json`'s `version`
+  was bumped to `1.1.0` and this release should be tagged `v1.1.0` (not re-uploaded to
+  `v1.0.0`). **Both of these need to keep happening on every future release** for the
+  update-check to ever detect anything as newer — flag this prominently if resuming work
+  and about to publish a release, since reverting to the old clobber-same-tag habit would
+  silently break this entire feature without any obvious symptom (the app would just always
+  say "you're up to date").
+- **Verification**: typechecked clean; web-preview confirmed the Settings UI renders
+  correctly and the "Check for Updates" tap gracefully hits the `Platform.OS === 'web'`
+  guard with zero console errors (the button correctly resets out of its "Checking…" state
+  rather than getting stuck). **Everything else — the actual GitHub API check, the version
+  comparison against a real installed build, the backup-then-download-then-install
+  hand-off — is entirely native-only and has not been exercised end-to-end.** This is the
+  single feature in this whole session most in need of real-device confirmation before
+  trusting it.
+- **Rebuild**: full prebuild + rebuild (two new native modules) — `BUILD SUCCESSFUL in
+  18m 39s` (828 tasks, 796 executed). Copied to `builds/bpd2.apk` (47.7MB). This build also
+  includes the zip-slip fix from the security review below (synced into the mirror mid-build,
+  while Gradle was still in native compilation, before the JS-bundling step ran — confirmed
+  safe to do, since source files are only read fresh at that specific step).
+
+## Follow-up: whole-app security review (2026-10-01)
+
+User asked for a full review of security protocols across every component, front-end and
+back-end (this app has no real backend — offline-first, no server, confirmed relevant up
+front rather than assumed). Findings were based on actually checking things, not general
+impressions — `npm audit --json`'s real output, `build.gradle`'s actual signing config, and
+a web search on `react-native-zip-archive`'s CVE history — not asserted from memory.
+
+- **Fixed: zip-slip / path-traversal risk in Backup Restore.** `importBackup()` in
+  `src/services/backup.ts` accepts any file the user picks via `DocumentPicker` and unzips
+  it directly onto the live database/media location — the one place in this app where
+  genuinely untrusted input reaches a filesystem-writing operation. `react-native-zip-archive`
+  has a real, repeated CVE history of exactly this bug class (confirmed via its own GitHub
+  issues — #134 and #170, the former fixed in v4.1.5). This project's installed version
+  (9.5.1) is well past that fix, so the specific historical bug is very likely already
+  patched — but zip-slip is a recurring class across archive libraries generally (the same
+  search surfaced equivalent CVEs in `react-native-code-push`'s bundled archive handling),
+  so defense-in-depth was added regardless of the library's current state: a new
+  `assertNoUnsafeZipEntries()` helper calls the library's own `listContents()` to enumerate
+  every entry's path *before* extraction, and rejects the whole restore if any entry
+  contains a `..` path segment or starts with `/`. This is a genuine, shipped code change,
+  not just a written-down recommendation — see `src/services/backup.ts`.
+- **Flagged, not yet acted on (offered to the user, awaiting a decision)**:
+  1. **Release APK is signed with the shared debug keystore** — confirmed directly from
+     `android/app/build.gradle`: `storePassword 'android'`, `keyAlias 'androiddebugkey'`,
+     `keyPassword 'android'` are the universally-standard, publicly-documented Android debug
+     keystore credentials, not unique to this project. This has always been an acceptable
+     simplification for pure sideloading, but now that **Check for Updates relies entirely
+     on Android's own signature-matching** to decide what counts as a legitimate update to
+     this app, generating a real, uniquely-passworded release keystore is worth doing —
+     Google's own docs explicitly advise against shipping debug-signed release builds. Real
+     practical risk today is bounded by local machine access (the keystore file itself isn't
+     committed to git), not zero, but a clean one-time fix if the user wants it.
+  2. **Backups are unencrypted.** `exportBackup()`'s `.zip` has no password — anyone who
+     gets hold of the exported file can read every job record and photo in plaintext.
+     `react-native-zip-archive` already exposes `zipWithPassword()`/`unzipWithPassword()`
+     (confirmed from its own `.d.ts`, already read earlier this session) — an optional
+     password prompt on export/restore is a small, ready-to-build addition if wanted.
+- **Checked and confirmed solid, not just assumed**:
+  - Zero SQL injection surface anywhere in the codebase — every DB call across every file
+    uses parameterized `?` placeholders, confirmed by review, never string-interpolated user
+    input.
+  - `npm audit`'s 12 flagged packages (seen throughout this session's install logs) are
+    **entirely Expo CLI/build-tooling internals** (`@expo/cli`, `@expo/config-plugins`,
+    `xcode`, `brace-expansion`) — confirmed via `npm audit --json`'s actual dependency-path
+    output, not assumed from the summary line. None of them ship inside the compiled app;
+    zero runtime-bundle exposure.
+  - Permissions are minimal and each maps to a real, disclosed feature (camera, microphone,
+    photo library, and the new `REQUEST_INSTALL_PACKAGES`) — no excessive asks.
+  - Making the repo public leaked nothing — already verified no secrets were ever committed,
+    before the very first commit this session made.
+  - No embedded secrets anywhere — the entire reason the update-checker needed a public repo
+    in the first place was specifically to avoid needing to embed a GitHub token in the APK.
+- **Not a code fix, but the real trust boundary worth naming explicitly**: the GitHub
+  account (`mikachamp`) that can push releases to this now-public repo *is* the security
+  boundary for the update-check feature — anyone who could publish a release to this repo
+  could get this app to offer installing whatever they attached. Recommended 2FA on that
+  account if not already enabled; this is a process/account recommendation, not something
+  fixable in code.
 
 ### Git state
 This repo had **zero commits for the entire project up to this point** — asked the user

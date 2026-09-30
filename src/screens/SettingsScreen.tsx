@@ -7,6 +7,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList, MainTabParamList } from '../navigation/types';
 import { getDispatcherContact, setDispatcherContact } from '../db/settings';
 import { exportBackup, importBackup } from '../services/backup';
+import {
+  backupThenDownloadAndInstall,
+  checkForUpdate,
+  currentVersion,
+  openInstallPermissionSettings,
+  type UpdateInfo,
+} from '../services/appUpdate';
 import { colors, radius, spacing, typography } from '../theme/theme';
 
 type Props = CompositeScreenProps<
@@ -20,6 +27,8 @@ export function SettingsScreen({ navigation }: Props) {
   const [loaded, setLoaded] = useState(false);
   const [isExportingBackup, setIsExportingBackup] = useState(false);
   const [isRestoringBackup, setIsRestoringBackup] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [isInstallingUpdate, setIsInstallingUpdate] = useState(false);
 
   useEffect(() => {
     getDispatcherContact().then((contact) => {
@@ -88,6 +97,52 @@ export function SettingsScreen({ navigation }: Props) {
         { text: 'Restore', style: 'destructive', onPress: runRestore },
       ]
     );
+  };
+
+  const runUpdate = async (update: UpdateInfo) => {
+    setIsInstallingUpdate(true);
+    try {
+      await backupThenDownloadAndInstall(update);
+    } catch (error) {
+      Alert.alert(
+        'Update failed',
+        "Could not install the update. If Android blocked it, allow this app to install other apps, then try again.",
+        [
+          { text: 'OK', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => { openInstallPermissionSettings().catch(() => {}); } },
+        ]
+      );
+    } finally {
+      setIsInstallingUpdate(false);
+    }
+  };
+
+  const handleCheckForUpdate = async () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Not available in web preview', 'Update checks only work in the installed Android app.');
+      return;
+    }
+    setIsCheckingUpdate(true);
+    try {
+      const update = await checkForUpdate();
+      if (!update) {
+        Alert.alert("You're up to date", `Running the latest version (${currentVersion()}).`);
+        return;
+      }
+      Alert.alert(
+        `Update available — ${update.tagName}`,
+        'This backs up your current data first, then downloads the update and hands off to Android to install it — you\'ll need to confirm the install yourself.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Back Up & Update', onPress: () => runUpdate(update) },
+        ]
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not check for updates. Please try again.';
+      Alert.alert('Update check failed', message);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
   };
 
   useLayoutEffect(() => {
@@ -168,6 +223,26 @@ export function SettingsScreen({ navigation }: Props) {
             >
               <Text style={styles.secondaryButtonText}>
                 {isRestoringBackup ? 'Restoring…' : '♻️ Restore from Backup'}
+              </Text>
+            </Pressable>
+
+            <Text style={[styles.sectionLabel, styles.sectionSpacing]}>App Updates</Text>
+            <Text style={styles.helperText}>
+              Current version {currentVersion()}. Checks GitHub for a newer release, backs up
+              your data automatically, then walks you through installing it — Android always
+              requires you to confirm the install yourself.
+            </Text>
+            <Pressable
+              style={[styles.secondaryButton, styles.fieldSpacing]}
+              onPress={handleCheckForUpdate}
+              disabled={isCheckingUpdate || isInstallingUpdate}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {isInstallingUpdate
+                  ? 'Backing up & downloading…'
+                  : isCheckingUpdate
+                    ? 'Checking…'
+                    : '🔄 Check for Updates'}
               </Text>
             </Pressable>
           </View>
