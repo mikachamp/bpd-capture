@@ -9,16 +9,31 @@ import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import {
+  DuplicateCeNumberError,
   deleteOrder,
   getOrderById,
+  updateOrderCeNumber,
   updateOrderClientInfo,
   updateOrderDueDate,
   updateOrderNotes,
   updateOrderStatus,
 } from '../db/orders';
-import { addMediaItem, deleteMediaItem, listMediaForOrder, renameMediaItem } from '../db/mediaItems';
-import { deleteMediaFile, deleteOrderDirectory, renameMediaFile, saveCapturedMedia } from '../services/storage';
+import {
+  addMediaItem,
+  deleteMediaItem,
+  listMediaForOrder,
+  renameMediaItem,
+  updateMediaFilePathsForOrder,
+} from '../db/mediaItems';
+import {
+  deleteMediaFile,
+  deleteOrderDirectory,
+  renameMediaFile,
+  renameOrderDirectory,
+  saveCapturedMedia,
+} from '../services/storage';
 import { exportAndShareJobReport } from '../services/reportPdf';
+import { isValidCeNumber } from '../utils/ceNumber';
 import type { MediaItem, Order, OrderStatus } from '../types/models';
 import { MediaGrid } from '../components/MediaGrid';
 import { StatusToggle } from '../components/StatusToggle';
@@ -37,6 +52,7 @@ export function JobDetailScreen({ route, navigation }: Props) {
   const [notesDraft, setNotesDraft] = useState('');
   const [clientNameDraft, setClientNameDraft] = useState('');
   const [projectNameDraft, setProjectNameDraft] = useState('');
+  const [ceNumberDraft, setCeNumberDraft] = useState('');
   const [detailsLoadedFor, setDetailsLoadedFor] = useState<number | null>(null);
 
   useEffect(() => {
@@ -44,6 +60,7 @@ export function JobDetailScreen({ route, navigation }: Props) {
       setNotesDraft(order.notes ?? '');
       setClientNameDraft(order.clientName ?? '');
       setProjectNameDraft(order.projectName ?? '');
+      setCeNumberDraft(order.ceNumber);
       setDetailsLoadedFor(order.id);
     }
   }, [order, detailsLoadedFor]);
@@ -59,8 +76,6 @@ export function JobDetailScreen({ route, navigation }: Props) {
       reload();
     }, [reload])
   );
-
-  const [justSaved, setJustSaved] = useState(false);
 
   const handleStatusChange = async (status: OrderStatus) => {
     await updateOrderStatus(orderId, status);
@@ -107,11 +122,36 @@ export function JobDetailScreen({ route, navigation }: Props) {
     await updateOrderClientInfo(orderId, trimmedClient || null, trimmedProject || null);
   };
 
+  const handleCeNumberBlur = async () => {
+    const trimmed = ceNumberDraft.trim();
+    if (!order || trimmed === order.ceNumber) return;
+    if (!isValidCeNumber(trimmed)) {
+      Alert.alert('Invalid CE number', 'Enter a valid CE number.');
+      setCeNumberDraft(order.ceNumber);
+      return;
+    }
+    const oldCeNumber = order.ceNumber;
+    try {
+      const updated = await updateOrderCeNumber(order.id, trimmed);
+      await renameOrderDirectory(oldCeNumber, updated.ceNumber);
+      await updateMediaFilePathsForOrder(order.id, oldCeNumber, updated.ceNumber);
+      setOrder(updated);
+      setCeNumberDraft(updated.ceNumber);
+      await reload();
+    } catch (error) {
+      if (error instanceof DuplicateCeNumberError) {
+        Alert.alert('CE already exists', `An order for CE number "${trimmed}" already exists.`);
+      } else {
+        Alert.alert('Update failed', 'Could not update the CE number. Please try again.');
+      }
+      setCeNumberDraft(oldCeNumber);
+    }
+  };
+
   const handleSaveAll = async () => {
     Keyboard.dismiss();
-    await Promise.all([handleClientInfoBlur(), handleNotesBlur()]);
-    setJustSaved(true);
-    setTimeout(() => setJustSaved(false), 1200);
+    await Promise.all([handleCeNumberBlur(), handleClientInfoBlur(), handleNotesBlur()]);
+    navigation.goBack();
   };
 
   const handleExportReport = async () => {
@@ -158,12 +198,12 @@ export function JobDetailScreen({ route, navigation }: Props) {
       title: order?.ceNumber ?? 'Job Detail',
       headerRight: () => (
         <Pressable onPress={handleSaveAll} hitSlop={8}>
-          <Text style={styles.headerSaveText}>{justSaved ? 'Saved ✓' : 'Save'}</Text>
+          <Text style={styles.headerSaveText}>Save</Text>
         </Pressable>
       ),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigation, order?.ceNumber, clientNameDraft, projectNameDraft, notesDraft, justSaved]);
+  }, [navigation, order?.ceNumber, ceNumberDraft, clientNameDraft, projectNameDraft, notesDraft]);
 
   const handleUploadFromGallery = async () => {
     if (!order) return;
@@ -209,7 +249,14 @@ export function JobDetailScreen({ route, navigation }: Props) {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.ceNumber}>{order.ceNumber}</Text>
+          <TextInput
+            value={ceNumberDraft}
+            onChangeText={setCeNumberDraft}
+            onBlur={handleCeNumberBlur}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            style={styles.ceNumberInput}
+          />
           <Text style={styles.timestamps}>
             Opened {format(new Date(order.createdAt), 'MMM d, yyyy')}
             {order.completedAt ? ` · Completed ${format(new Date(order.completedAt), 'MMM d, yyyy')}` : ''}
@@ -338,8 +385,12 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.md,
   },
-  ceNumber: {
+  ceNumberInput: {
     ...typography.display,
+    padding: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    paddingBottom: spacing.xs,
   },
   timestamps: {
     ...typography.caption,

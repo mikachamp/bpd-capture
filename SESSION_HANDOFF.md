@@ -4,8 +4,20 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
-## TL;DR — current state (last updated 2026-09-22, Clients + UX-restructure round)
+## TL;DR — current state (last updated 2026-10-01, CE-edit + heading-swap round)
 
+- **Three user-reported gaps fixed, rebuilt into `builds/bpd2.apk`, committed and pushed**:
+  (1) CE Number was the one field on Job Detail with no edit option — now editable, with the
+  on-disk media folder and every media_items.filePath row renamed to match (not just the DB
+  column); (2) tapping the header "Save" button on Job Detail now navigates back to the
+  Dashboard instead of just flashing "Saved ✓" and staying put; (3) job cards across
+  Dashboard/Search now show **Project Name** as the bold heading (falling back to CE number
+  when a job has none) with Client Name + CE Number demoted to the secondary line — CE
+  number is still visible, just no longer the headline. See "Follow-up: CE Number editing,
+  Save-closes-page, Project-Name headings" below for full details. **Not yet confirmed on
+  the real device** — ask the user to check all three on their S21, especially the CE-number
+  rename (on-disk folder rename + media path rewrite is native-only, couldn't be exercised
+  beyond web preview here).
 - **Two rounds of external "Gemini" implementation plans landed this round, both reviewed
   and handled by this session**: (1) a bottom-tab UX restructure (Home/Calendar/Insights/
   Settings tabs, unified search, segmented In Process/Completed, FAB) — reviewed and
@@ -1115,6 +1127,78 @@ directly** (not Gemini), resolving each open point as noted:
   external source (Gemini or otherwise) without going through this session's own
   `npx expo install`, diff `package.json` against the mirror's `node_modules` before
   assuming "JS-only, skip npm install" — don't rely on "no native module" alone to skip it.
+
+## Follow-up: CE Number editing, Save-closes-page, Project-Name headings (2026-10-01)
+
+Three plain-language bug reports/requests from the user in one message, all implemented
+directly by this session (no Gemini involved this round):
+
+1. **CE Number is now editable on Job Detail.** It was the one field on that screen still a
+   plain `Text` display — every other field (client, project, notes, due date, status) was
+   already editable inline. This is more than a text-field swap because the CE number is
+   baked into two other places:
+   - **The on-disk media folder is named after it** (`src/services/storage.ts`'s
+     `getOrderDirectory(ceNumber)`) — renaming the CE number without moving this folder
+     would silently orphan every existing photo/video for that job.
+   - **Every `media_items.filePath` row has the old CE number baked into its stored path**
+     (since `saveCapturedMedia` builds paths from the folder above) — moving the folder
+     alone would leave the database pointing at paths that no longer exist.
+
+   Fixed with three new pieces, all invoked together in `JobDetailScreen.tsx`'s new
+   `handleCeNumberBlur()`:
+   - `updateOrderCeNumber(id, newCe)` in `src/db/orders.ts` — validates via the same
+     `isValidCeNumber`/`normalizeCeNumber` helpers `NewOrderScreen` already uses, checks for
+     a conflicting existing order (excluding itself) via the existing `getOrderByCe`, throws
+     the same `DuplicateCeNumberError` `NewOrderScreen` already handles. Mirrored in
+     `webMock.ts`'s `updateCeNumber`.
+   - `renameOrderDirectory(oldCe, newCe)` in `storage.ts` — moves the whole folder via
+     `Directory.move()` (a no-op if the job has no media yet, i.e. the folder was never
+     created).
+   - `updateMediaFilePathsForOrder(orderId, oldCe, newCe)` in `db/mediaItems.ts` — a single
+     `UPDATE media_items SET filePath = REPLACE(filePath, ?, ?) WHERE orderId = ?`, relying
+     on SQLite's built-in `REPLACE()` scalar function against the CE-number substring. Web
+     preview no-ops here since mock media paths are picsum URLs/blob URIs, not real folders.
+   - The CE Number field keeps its original large "page title" styling
+     (`typography.display`) rather than looking like a boxed form field — just gained a
+     hairline bottom border as the only visual cue that it's now editable, to preserve the
+     screen's existing visual identity.
+   - **Native-only**: the folder-move and filePath-rewrite are both real file-system/SQLite
+     operations that only run on-device. Web preview verified the DB-level rename (order
+     updates, list reflects new CE number after Save) but the folder-move/path-rewrite logic
+     itself is unverified until a real device test with actual captured photos.
+
+2. **Tapping "Save" on Job Detail now closes the page.** `handleSaveAll` previously just
+   flushed the pending field blurs and flashed "Saved ✓" in the header for 1.2s, staying on
+   the same screen — removed that `justSaved` state entirely and added `navigation.goBack()`
+   as the last step, after `handleCeNumberBlur()` was also folded into the same
+   `Promise.all(...)` alongside the existing client-info/notes flushes (so a CE number edit
+   made via typing-then-tapping-Save, without ever blurring the field first, still gets
+   persisted). Deliberately scoped to **Job Detail only** — `NewOrderScreen`'s Save already
+   navigates away (via `navigation.replace('JobDetail', ...)` on successful creation) and
+   `SettingsScreen`'s Save has no "page to close" concept since Settings is a persistent
+   bottom tab, not a pushed screen.
+
+3. **Job cards show Project Name instead of CE Number as the heading.** This was
+   deliberately clarified with the user first — the request said "campaign names," which
+   isn't a field this app has; confirmed it meant **Project Name** (e.g. "Roof replacement
+   — 14 Ashford Ct"), and that CE Number should stay visible, just smaller/secondary rather
+   than disappearing. `src/components/OrderListItem.tsx`: `heading = order.projectName ||
+   order.ceNumber` (never blank, even for the handful of seed jobs with no project name set)
+   and the old `clientLine` became `metaLine = [order.clientName, order.ceNumber].filter(...)
+   .join(' · ')` — CE number is now guaranteed to appear on that line since it's never null,
+   unlike the old client-name-only line which could be empty. **Scope note, flagged but not
+   acted on**: `CalendarScreen.tsx`'s own `WeekList` and `MonthCalendarBoard` render their own
+   bespoke job rows (not `OrderListItem`) and still show the CE number as their heading —
+   only `OrderListItem` (Dashboard's Home tab + the Search screens) was changed, since the
+   user's wording ("the dashboards") most naturally scoped to that. Revisit if the user
+   wants Calendar's rows to match too.
+
+- **Verification**: typechecked clean; full Playwright pass confirmed the heading swap
+  renders correctly on Home, the CE Number field is editable with its visual identity
+  preserved, editing it to a new value and tapping Save correctly navigates back to the
+  Dashboard with the updated CE number reflected on the card, zero console errors.
+- **Rebuild**: JS-only, fast incremental path — `BUILD SUCCESSFUL in 5m 50s`. Copied to
+  `builds/bpd2.apk` (47.6MB).
 
 ### Git state
 This repo had **zero commits for the entire project up to this point** — asked the user

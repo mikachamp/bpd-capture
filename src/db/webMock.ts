@@ -367,6 +367,19 @@ export const webOrders = {
     orders.unshift(order);
     return withCoverImage(order);
   },
+  async updateCeNumber(id: number, ceNumber: string): Promise<Order> {
+    const conflict = orders.find((o) => o.ceNumber === ceNumber && o.id !== id);
+    if (conflict) {
+      throw new DuplicateCeNumberErrorWeb(ceNumber);
+    }
+    const order = orders.find((o) => o.id === id);
+    if (!order) {
+      throw new Error('Order not found.');
+    }
+    order.ceNumber = ceNumber;
+    order.updatedAt = new Date().toISOString();
+    return withCoverImage(order);
+  },
   async updateDueDate(id: number, dueDate: string | null): Promise<void> {
     const order = orders.find((o) => o.id === id);
     if (!order) return;

@@ -110,6 +110,20 @@ export async function deleteOrderDirectory(ceNumber: string): Promise<void> {
   }
 }
 
+/**
+ * Renaming a CE number moves its media folder to match — callers must also
+ * update every media_items.filePath row for the order (see
+ * db/mediaItems.ts's updateMediaFilePathsForOrder) since this only moves the
+ * files on disk, not the paths already stored in the database.
+ */
+export async function renameOrderDirectory(oldCeNumber: string, newCeNumber: string): Promise<void> {
+  if (isWeb) return;
+  const oldDir = getOrderDirectory(oldCeNumber);
+  if (!oldDir.exists) return;
+  const newDir = getOrderDirectory(newCeNumber);
+  await oldDir.move(newDir);
+}
+
 async function saveToGallery(fileUri: string): Promise<void> {
   const permission = await MediaLibrary.requestPermissionsAsync();
   if (permission.status !== 'granted') {

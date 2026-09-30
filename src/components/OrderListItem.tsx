@@ -34,7 +34,8 @@ export function OrderListItem({ order, onPress, onDueDateChange }: Props) {
   const dateLabel = isCompleted && order.completedAt
     ? `Completed ${format(new Date(order.completedAt), 'MMM d, yyyy')}`
     : `Opened ${format(new Date(order.createdAt), 'MMM d, yyyy')}`;
-  const clientLine = [order.clientName, order.projectName].filter(Boolean).join(' · ');
+  const heading = order.projectName || order.ceNumber;
+  const metaLine = [order.clientName, order.ceNumber].filter(Boolean).join(' · ');
   const { style: pressStyle, onPressIn, onPressOut } = usePressScale();
 
   return (
@@ -52,12 +53,10 @@ export function OrderListItem({ order, onPress, onDueDateChange }: Props) {
         )}
         <View style={styles.info}>
           <View style={styles.ceNumberRow}>
-            <Text style={styles.ceNumber} numberOfLines={1}>{order.ceNumber}</Text>
+            <Text style={styles.ceNumber} numberOfLines={1}>{heading}</Text>
             {order.notes ? <Text style={styles.noteIcon}>📝</Text> : null}
           </View>
-          {clientLine ? (
-            <Text style={styles.clientLine} numberOfLines={1}>{clientLine}</Text>
-          ) : null}
+          <Text style={styles.clientLine} numberOfLines={1}>{metaLine}</Text>
           <Text style={styles.dateLabel} numberOfLines={1}>{dateLabel}</Text>
         </View>
         <View style={[styles.badge, isCompleted ? styles.badgeCompleted : styles.badgeInProcess]}>

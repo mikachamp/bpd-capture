@@ -53,3 +53,25 @@ export async function deleteMediaItem(id: number): Promise<void> {
   const db = await getDb();
   await db.runAsync(`DELETE FROM media_items WHERE id = ?`, id);
 }
+
+/**
+ * Renaming a CE number moves its on-disk media folder (see
+ * services/storage.ts's renameOrderDirectory), which leaves every stored
+ * filePath pointing at the old, now-nonexistent folder name unless those
+ * rows are updated too. Web preview's media paths are picsum URLs/blob
+ * URIs, not real folders, so there's nothing to rewrite there.
+ */
+export async function updateMediaFilePathsForOrder(
+  orderId: number,
+  oldCeNumber: string,
+  newCeNumber: string
+): Promise<void> {
+  if (isWeb) return;
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE media_items SET filePath = REPLACE(filePath, ?, ?) WHERE orderId = ?`,
+    oldCeNumber,
+    newCeNumber,
+    orderId
+  );
+}

@@ -75,6 +75,35 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   return order;
 }
 
+export async function updateOrderCeNumber(id: number, rawCeNumber: string): Promise<Order> {
+  const ceNumber = normalizeCeNumber(rawCeNumber);
+
+  if (isWeb) {
+    try {
+      return await webOrders.updateCeNumber(id, ceNumber);
+    } catch (error) {
+      if (error instanceof DuplicateCeNumberErrorWeb) {
+        throw new DuplicateCeNumberError(ceNumber);
+      }
+      throw error;
+    }
+  }
+
+  const existing = await getOrderByCe(ceNumber);
+  if (existing && existing.id !== id) {
+    throw new DuplicateCeNumberError(ceNumber);
+  }
+
+  const db = await getDb();
+  const now = new Date().toISOString();
+  await db.runAsync(`UPDATE orders SET ceNumber = ?, updatedAt = ? WHERE id = ?`, ceNumber, now, id);
+  const order = await getOrderById(id);
+  if (!order) {
+    throw new Error('Failed to update CE number.');
+  }
+  return order;
+}
+
 export async function updateOrderDueDate(id: number, dueDate: string | null): Promise<void> {
   if (isWeb) return webOrders.updateDueDate(id, dueDate);
   const db = await getDb();
