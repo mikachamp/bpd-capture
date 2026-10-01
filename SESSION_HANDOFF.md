@@ -4,6 +4,60 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
+## TL;DR — current state (2026-10-01, 3D startup animation round)
+
+- **Replaced the cold-start splash with a real three.js scene**, rendered via `expo-gl`'s
+  `GLView` (not a video/Lottie/image sequence — live WebGL geometry). Concept: a
+  blueprint-style job sheet assembles itself and gets a CE-stamp seal while hidden behind a
+  closed camera iris; the iris then mechanically opens to reveal the finished document.
+  Ported from a concept gallery built for the desktop app
+  (`BPD_Capture_Desktop/loading-screen-concepts/index.html`, concept 4 "Mix") — see that
+  file for 3 other concepts considered (camera aperture alone, blueprint alone, an orbiting
+  "job network") before this combined one was chosen.
+- **New files**: `src/components/startupAperture.ts` (the scene builder — geometry, lights,
+  `tick(t)` animation function, `dispose()`), `src/utils/expoThreeRenderer.ts` (a small
+  canvas shim so three.js's `WebGLRenderer` accepts expo-gl's context — hand-rolled instead
+  of depending on `expo-three`, see below for why). `src/components/StartupAnimation.tsx`
+  was rewritten to host a `GLView` + text overlay instead of its previous pure-Reanimated
+  "production line" animation; `onFinish` contract unchanged so `App.tsx` needed no edits.
+- **New dependencies**: `expo-gl` (installed via `npx expo install` so it resolved the
+  correct SDK-57-matched version, `~57.0.2`), `three` (pinned to `0.166.1` — see below),
+  `@types/three` (dev).
+- **Deliberately did NOT install `expo-three`**: tried it first (it's the
+  Expo-docs-recommended three.js integration wrapper), but its dependency tree pulls in
+  `@expo/browser-polyfill@^1.0.1`, which itself peer-depends on `react-native@^0.64.3` — this
+  project is on `0.86.3`. That's a strong staleness signal for an unmaintained wrapper, so
+  instead of risking subtle runtime breakage, uninstalled it and hand-rolled the ~15-line
+  canvas shim it would have provided (`createExpoThreeRenderer` in
+  `expoThreeRenderer.ts`). If three.js needs on RN ever grow (text labels, model loading,
+  post-processing), revisit whether a more actively maintained wrapper exists rather than
+  hand-rolling more of expo-three's surface.
+- **`three` pinned to `0.166.1`** (not latest, which is `0.186.x` as of this round) —
+  matches the floor of `expo-three`'s declared peer range (`^0.166.0`) even though
+  expo-three itself isn't installed, on the theory that this is the version era the
+  hand-rolled renderer shim pattern was actually proven against. Revisit this pin
+  deliberately if upgrading, not as a side effect of an unrelated `npm update`.
+- **Verified in web preview** (not emulator, per this project's established discipline):
+  `npx expo start --web`, confirmed via screenshots that (1) it boots with no console
+  errors, (2) the 3D scene actually renders (blueprint panels flying into formation behind
+  the iris, visible mid-assembly), (3) after the ~3s timer it hands off cleanly to the real
+  Dashboard. **Note**: the very first web bundle after adding three.js took noticeably
+  longer to compile (~100-160s per the dev server's own log, vs. a few seconds normally) —
+  if a future round sees the web preview looking stuck/blank right after a `three`-related
+  change, check the dev server log's `metro:bundling:done` timing before assuming something
+  broke; it may just be mid-bundle.
+- **Native rebuild required and done**: `expo-gl` is a native module, so this needed a full
+  `expo prebuild` + `assembleRelease` cycle (JS-only incremental builds wouldn't pick up the
+  new native linking). Version bumped to **1.3.0** in `app.json`. See the build/release
+  section below for the exact outcome.
+- **Not yet done**: the equivalent 3D loading screen for the **desktop** app
+  (`BPD_Capture_Desktop`) — the concept is chosen and proven on both platforms' respective
+  renderers now (three.js + DOM canvas on desktop, three.js + expo-gl on mobile), but
+  `BPD_Capture_Desktop/src/renderer/src/components/LoadingScreen.tsx` still has the earlier
+  single-aperture version, not the mix. Swap it to port `startupAperture.ts`'s scene (same
+  three.js APIs, just running in a browser context rather than expo-gl) next time that
+  project is picked up.
+
 ## TL;DR — current state (last updated 2026-10-01, real-device feedback round)
 
 - **Two user-reported issues fixed from testing the v1.1.0 build on the S21**: (1) Job
