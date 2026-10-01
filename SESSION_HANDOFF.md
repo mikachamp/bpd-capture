@@ -4,6 +4,63 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
+## TL;DR — current state (2026-10-01, real-device update-flow bug hunt)
+
+User tested v1.3.0 on a real phone via the in-app "Check for Updates" and hit
+two separate, previously-undiscovered bugs — both from the fact that this was
+the **first time an actual on-device update install was tested end to end**
+(prior rounds only verified the check/UI logic, never a real install-over
+an-existing-app):
+
+1. **FOUND AND FIXED — `versionCode` was never set, so no release has ever
+   actually been able to install as an update.** `app.json` only set the
+   semantic `"version"` string (e.g. `"1.3.0"`); Android's package installer
+   doesn't use that for upgrade decisions — it uses a separate integer
+   `versionCode`, and **silently refuses to install an APK whose versionCode
+   isn't strictly greater than the currently-installed one** (no crash, no
+   visible error on some OEM skins — just nothing happens, which is exactly
+   what the user saw: "I updated from GitHub but it still says 1.1"). Because
+   this project's `expo prebuild` regenerates `android/` from scratch every
+   build and nothing in `app.json` pinned a versionCode, **every single
+   release (v1.1.0, v1.2.0, v1.3.0) was built with the same default
+   `versionCode 1`** — confirmed by grepping the generated
+   `android/app/build.gradle`. Only the very first install onto a phone could
+   ever have succeeded; every subsequent "update" attempt was a no-op by
+   Android's own design. **Fixed**: added `"versionCode": 5` explicitly under
+   `android` in `app.json` (alongside bumping `"version"` to `1.3.1`) — **this
+   must be incremented by 1 on every future release from now on**, it will
+   not happen automatically. Worth a pre-release checklist item: confirm
+   the generated `build.gradle`'s `versionCode` actually increased before
+   calling a release done.
+2. **FOUND, NOT YET FIXABLE BY US — the GitHub repo is unreachable by
+   anonymous/unauthenticated requests**, which is exactly what the in-app
+   update checker makes (deliberately — see `appUpdate.ts`'s comment on why
+   it can't embed a token). Verified four independent ways: plain `curl` to
+   `api.github.com/repos/mikachamp/bpd-capture` (404), `curl` to the plain
+   `github.com/mikachamp/bpd-capture` web page (404), a separate fetch tool
+   (404), vs. the authenticated `gh` CLI which sees the repo completely
+   normally (`"private": false`, `"visibility": "public"`, not archived/
+   disabled/flagged in any field the API exposes). Ruled out: a GitHub
+   platform outage (status page showed API Requests operational), a local
+   network/DNS problem (hit an unrelated public repo, `facebook/react`,
+   unauthenticated from the same shell — worked fine), and GitHub's
+   "no User-Agent header" 403 gotcha (tested — that produces 403, not the
+   404 actually observed). This signature — API says public, but anonymous
+   traffic 404s — matches an **account-level restriction on `mikachamp`**
+   (most commonly caused by an unverified account email), which isn't
+   visible via the API/`gh` CLI, only on github.com while logged in as that
+   account. **Action needed from the user, not from code**: check
+   `github.com/mikachamp/bpd-capture` in an incognito/logged-out browser
+   window to confirm the 404 independently, then check account settings for
+   a verification banner. Until this resolves, the in-app update checker
+   cannot work no matter how correct its code is — sideloading the APK
+   directly (as before) remains the only path.
+- **Rebuild in progress / done**: same mirror-sync + prebuild + assembleRelease
+  pipeline as every other native-change round (`versionCode` is baked into
+  the native manifest at prebuild time, so this needed a full native rebuild,
+  not just a JS bump). Released as **v1.3.1**. Check the GitHub releases page
+  for confirmation this landed if picking this up fresh.
+
 ## TL;DR — current state (2026-10-01, 3D startup animation round)
 
 - **Replaced the cold-start splash with a real three.js scene**, rendered via `expo-gl`'s
