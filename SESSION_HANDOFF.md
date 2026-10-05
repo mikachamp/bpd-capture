@@ -4,6 +4,64 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
+## TL;DR — current state (2026-10-06, startup crash fix + native test pass, v1.3.2)
+
+**User reported v1.3.1 crashing on startup** (phone not available to plug in). Fixed and
+verified natively on the emulator this time — see "Emulator is usable again" below.
+
+1. **Root cause of the crash**: three.js r163+ throws `WebGL 1 is not supported since r163`
+   whenever `context instanceof WebGLRenderingContext`. expo-gl (SDK 57) deliberately makes
+   its native `WebGL2RenderingContext` *extend* `WebGLRenderingContext`
+   (`node_modules/expo-gl/common/EXWebGLRenderer.cpp`), so that check misfires on every
+   native device and the renderer constructor throws — uncaught in a release build = instant
+   crash at launch. Web preview never showed it because browsers keep the two classes
+   separate. **Fix** in `src/utils/expoThreeRenderer.ts`: temporarily set
+   `globalThis.WebGLRenderingContext = undefined` only around `new THREE.WebGLRenderer(...)`
+   (grep confirmed it's three's single use of that global), plus an explicit
+   `supportsWebGL2` check. **Lesson**: web preview cannot validate anything GL/native —
+   expo-gl's web path is a different implementation entirely.
+2. **Crash-proofing**: `StartupAnimation.tsx` now wraps context creation *and* every frame in
+   try/catch; any failure drops the 3D view and lets the wordmark-only splash finish. A
+   decorative splash must never be able to take the app down again.
+3. **Animation polish** (verified frame-by-frame on emulator): GLView is now full-screen
+   (`StyleSheet.absoluteFill`) so blades exit the screen edge instead of being clipped by a
+   visible rectangle; the camera auto-fits the sheet to any aspect ratio (`buildStartupScene
+   (aspect, liftY)`); on opening, the iris ring widens and blades fade to 30% so the sheet and
+   CE stamp end fully clear. **Gotcha hit**: `StyleSheet.absoluteFillObject` no longer exists
+   in RN 0.86 — spreading it silently produced an empty style, the GLView got zero size and
+   `onContextCreate` never fired (black screen, no error). Only `tsc` caught it. Use
+   `StyleSheet.absoluteFill`.
+4. **Calendar bug (real, affected the phone too)**: `MonthCalendarBoard` and
+   `DueDateCalendarModal` used fixed 40px day cells in a `flexWrap` row — on screens wider
+   than ~360dp, 8 cells fit per row, so every date sat under the wrong weekday. Now each cell
+   is `14.2857%` wide.
+5. **Gallery-backup UX bugs**: (a) `requestPermissionsAsync()` with no args asked for "music
+   and audio" access on Android 13+ — now requests `['photo','video']` only. (b) Each capture
+   triggered an "Allow BPD Capture to modify this photo?" system dialog, because the asset was
+   created in DCIM then *moved* into the album. Now written straight into the album
+   (`createAssetAsync(uri, album)`, or `createAlbumAsync(name, undefined, undefined, uri)` on
+   first use) — verified two consecutive captures with zero prompts, files in
+   `Pictures/BPD Capture`.
+6. **Deliberately left alone** (both were earlier explicit user requests, per notes below):
+   camera/mic permissions requested at launch in `App.bootstrap.ts`, and
+   `seedDemoDataIfEmpty()`.
+7. **Desktop app** got the same scene improvements (copied to
+   `BPD_Capture_Desktop/src/renderer/src/components/startupScene.ts`; typechecks).
+
+### Emulator is usable again (reverses the old "don't use the emulator" note)
+`emulator -avd bpd_test -gpu host -no-snapshot -no-boot-anim -no-audio` boots in ~25s on this
+machine's RTX 4060 — the earlier hangs/segfaults were with `swiftshader_indirect`/`auto`.
+Dev loop that worked: x86_64 debug build once (`assembleDebug
+-PreactNativeArchitectures=x86_64`), Metro on 8081 + `adb reverse tcp:8081 tcp:8081`, launch
+via `exp+bpd-capture://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081`,
+screenshots via `adb exec-out screencap -p > file.png` (set `MSYS_NO_PATHCONV=1` in Git Bash
+or device paths get mangled). **Metro's file watcher misses edits on this machine** for the
+Android graph — always restart with `--clear` and grep the served bundle for a marker string
+before trusting a test run. Emulator's still-photo camera returns a black frame with a yellow
+timestamp — black thumbnails there are expected, not a bug. Release APKs must include
+`x86_64` (`-PreactNativeArchitectures=arm64-v8a,x86_64`) to run on the emulator; an
+arm64-only APK dies with `couldn't find DSO to load: libreactnative.so`.
+
 ## TL;DR — current state (2026-10-01, real-device update-flow bug hunt)
 
 User tested v1.3.0 on a real phone via the in-app "Check for Updates" and hit

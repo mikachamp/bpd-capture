@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
 import { buildStartupScene } from './startupAperture';
@@ -9,7 +9,8 @@ type Props = {
   onFinish: () => void;
 };
 
-const FINISH_AFTER_MS = 3000;
+// The iris finishes opening at ~2.8s; hold a beat on the revealed sheet.
+const FINISH_AFTER_MS = 3300;
 
 /**
  * The app's cold-start intro: a real three.js scene (rendered on expo-gl,
@@ -20,6 +21,7 @@ const FINISH_AFTER_MS = 3000;
  */
 export function StartupAnimation({ onFinish }: Props) {
   const activeRef = useRef(true);
+  const [glFailed, setGlFailed] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(onFinish, FINISH_AFTER_MS);
@@ -29,22 +31,40 @@ export function StartupAnimation({ onFinish }: Props) {
     };
   }, [onFinish]);
 
-  function handleContextCreate(gl: ExpoWebGLRenderingContext) {
-    const renderer = createExpoThreeRenderer(gl);
-    const aspect = gl.drawingBufferWidth / gl.drawingBufferHeight;
-    const { scene, camera, tick, dispose } = buildStartupScene(aspect);
+  // Any error escaping here would be an uncaught exception at launch, which a
+  // release build turns into an instant crash. A splash is never worth that:
+  // on failure, drop the 3D view and let the wordmark-only splash finish.
+  function failGracefully(error: unknown) {
+    console.warn('Startup animation disabled:', error);
+    activeRef.current = false;
+    setGlFailed(true);
+  }
 
+  function handleContextCreate(gl: ExpoWebGLRenderingContext) {
+    let renderer: ReturnType<typeof createExpoThreeRenderer>;
+    let sceneParts: ReturnType<typeof buildStartupScene>;
+    try {
+      renderer = createExpoThreeRenderer(gl);
+      sceneParts = buildStartupScene(gl.drawingBufferWidth / gl.drawingBufferHeight, 0.14);
+    } catch (error) {
+      failGracefully(error);
+      return;
+    }
+    const { scene, camera, tick } = sceneParts;
+
+    // No dispose on unmount: GLView tears down the GL context itself, and
+    // calling gl delete* on an already-destroyed native context is unsafe.
     const start = Date.now();
     const render = () => {
-      if (!activeRef.current) {
-        dispose();
-        renderer.dispose();
+      if (!activeRef.current) return;
+      try {
+        tick((Date.now() - start) / 1000);
+        renderer.render(scene, camera);
+        gl.endFrameEXP();
+      } catch (error) {
+        failGracefully(error);
         return;
       }
-      const t = (Date.now() - start) / 1000;
-      tick(t);
-      renderer.render(scene, camera);
-      gl.endFrameEXP();
       requestAnimationFrame(render);
     };
     render();
@@ -52,7 +72,7 @@ export function StartupAnimation({ onFinish }: Props) {
 
   return (
     <View style={styles.container}>
-      <GLView style={styles.glView} onContextCreate={handleContextCreate} />
+      {glFailed ? null : <GLView style={styles.glView} onContextCreate={handleContextCreate} />}
       <View style={styles.brand} pointerEvents="none">
         <Text style={styles.brandTitle}>BPD Capture</Text>
         <Text style={styles.brandSubtitle}>Job site photo documentation</Text>
@@ -65,17 +85,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.dark,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  glView: {
-    width: '100%',
-    height: '62%',
-  },
+  // Full-screen so swinging blades leave the screen edge naturally rather
+  // than being clipped by a visible rectangle mid-screen.
+  glView: StyleSheet.absoluteFill,
   brand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: '14%',
     alignItems: 'center',
     gap: spacing.sm,
-    marginTop: -spacing.xxl,
   },
   brandTitle: {
     color: colors.textOnDark,

@@ -125,16 +125,20 @@ export async function renameOrderDirectory(oldCeNumber: string, newCeNumber: str
 }
 
 async function saveToGallery(fileUri: string): Promise<void> {
-  const permission = await MediaLibrary.requestPermissionsAsync();
+  // Without granular permissions, Android 13+ also prompts for "music and
+  // audio" access — alarming for a photo app, and never needed here.
+  const permission = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
   if (permission.status !== 'granted') {
     return;
   }
 
-  const asset = await MediaLibrary.createAssetAsync(fileUri);
+  // Write straight into the album. Creating the asset elsewhere and then moving
+  // it in counts as modifying another file on Android 11+, which pops an
+  // "Allow BPD Capture to modify this photo?" dialog on every single capture.
   const existingAlbum = await MediaLibrary.getAlbumAsync(GALLERY_ALBUM_NAME);
   if (existingAlbum) {
-    await MediaLibrary.addAssetsToAlbumAsync([asset], existingAlbum, false);
+    await MediaLibrary.createAssetAsync(fileUri, existingAlbum);
   } else {
-    await MediaLibrary.createAlbumAsync(GALLERY_ALBUM_NAME, asset, false);
+    await MediaLibrary.createAlbumAsync(GALLERY_ALBUM_NAME, undefined, undefined, fileUri);
   }
 }

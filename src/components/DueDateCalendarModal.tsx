@@ -90,6 +90,8 @@ export function DueDateCalendarModal({ visible, initialDate, onClose, onSelect }
 }
 
 const DAY_SIZE = 40;
+// See MonthCalendarBoard: fixed px cells wrap 8-per-row on wide sheets.
+const SEVENTH = '14.2857%';
 
 const styles = StyleSheet.create({
   backdrop: {
@@ -125,7 +127,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   weekdayLabel: {
-    width: DAY_SIZE,
+    width: SEVENTH,
     textAlign: 'center',
     ...typography.label,
     fontSize: 11,
@@ -135,7 +137,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   dayCell: {
-    width: DAY_SIZE,
+    width: SEVENTH,
     height: DAY_SIZE,
     alignItems: 'center',
     justifyContent: 'center',

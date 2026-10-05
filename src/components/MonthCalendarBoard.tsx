@@ -8,6 +8,9 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAY_SIZE = 40;
+// A fixed px width lets flexWrap fit 8 cells per row on wider phones,
+// shifting every date under the wrong weekday — a seventh of the row can't.
+const SEVENTH = '14.2857%';
 
 type DotTone = 'accent' | 'danger' | 'success' | 'warning';
 
@@ -166,7 +169,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   weekdayLabel: {
-    width: DAY_SIZE,
+    width: SEVENTH,
     textAlign: 'center',
     ...typography.label,
     fontSize: 11,
@@ -176,7 +179,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   dayCell: {
-    width: DAY_SIZE,
+    width: SEVENTH,
     height: DAY_SIZE,
     alignItems: 'center',
     justifyContent: 'center',

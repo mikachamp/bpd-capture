@@ -17,10 +17,23 @@ function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
 
-export function buildStartupScene(aspect: number) {
+const FOV = 45;
+// Frame half-extents of the sheet, with breathing room for the stamp and edges.
+const FIT_HALF_W = 1.7 * 1.6;
+const FIT_HALF_H = 2.32 * 1.45;
+
+/**
+ * `liftY` raises the sheet by that fraction of the view's half-height, leaving
+ * room below it for a wordmark overlaid on a full-screen canvas.
+ */
+export function buildStartupScene(aspect: number, liftY = 0) {
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
-  camera.position.set(0, 0, 9.5);
+  const camera = new THREE.PerspectiveCamera(FOV, aspect, 0.1, 100);
+  // Fit to whichever axis is tighter so the sheet reads the same on a tall
+  // phone and a wide desktop window, instead of a fixed distance tuned to one.
+  const halfTan = Math.tan(((FOV / 2) * Math.PI) / 180);
+  const visibleHalfH = Math.max(FIT_HALF_H, FIT_HALF_W / aspect);
+  camera.position.set(0, -visibleHalfH * liftY, -1.4 + visibleHalfH / halfTan);
 
   const key = new THREE.PointLight(0xaab4ff, 8, 30);
   key.position.set(0, 2, 8);
@@ -140,6 +153,7 @@ export function buildStartupScene(aspect: number) {
     roughness: 0.35,
     emissive: 0x0b0f14,
     side: THREE.DoubleSide,
+    transparent: true,
   });
   disposables.push(bladeGeo, bladeMat);
 
@@ -183,6 +197,11 @@ export function buildStartupScene(aspect: number) {
     const rot = CLOSED + (OPEN - CLOSED) * openT + breathe;
     for (const p of pivots) (p.children[0] as THREE.Mesh).rotation.z = rot;
     irisGroup.rotation.z = openT >= 1 ? settled * 0.08 : 0;
+    // Swinging alone leaves blade tips over the sheet's corners and stamp;
+    // widening the ring retracts them past the sheet, and the fade keeps the
+    // remaining frame from competing with the revealed document.
+    irisGroup.scale.setScalar(1 + openT * 1.0);
+    bladeMat.opacity = 1 - openT * 0.7;
     backGlowMat.opacity = openT * 0.35;
 
     cyan.position.x = -4 + Math.sin(t * 0.4) * 1.5;
