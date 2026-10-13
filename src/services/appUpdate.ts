@@ -3,6 +3,7 @@ import { File, Paths } from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Application from 'expo-application';
 import { createLocalBackup } from './backup';
+import { getGitHubToken } from '../sync/syncService';
 
 /**
  * This app is sideloaded (no Play Store), so there is no store-level update
@@ -20,6 +21,8 @@ export type UpdateInfo = {
   tagName: string;
   version: string;
   downloadUrl: string;
+  /** Headers the download needs: the GitHub sign-in when the repo is private. */
+  downloadHeaders?: Record<string, string>;
   notes: string | null;
 };
 
@@ -50,9 +53,19 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
     throw new Error('Update checks only work in the installed Android app.');
   }
 
-  const response = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
+  // Signed in: read releases with the sync login, which also works once the repo is private.
+  // Signed out: anonymous request, which only works while the repo is public.
+  const token = await getGitHubToken().catch(() => null);
+  const auth: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  const response = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+    headers: { Accept: 'application/vnd.github+json', ...auth },
+  });
   if (!response.ok) {
-    throw new Error('Could not reach GitHub to check for updates. Check your connection and try again.');
+    throw new Error(
+      response.status === 404 && !token
+        ? 'Could not find the update on GitHub. If the app repo is private, sign in under Settings → Sync first.'
+        : 'Could not reach GitHub to check for updates. Check your connection and try again.'
+    );
   }
   const release = await response.json();
   const tagName: string = release.tag_name;
@@ -71,7 +84,9 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
   return {
     tagName,
     version: remoteVersion,
-    downloadUrl: asset.browser_download_url,
+    // The API asset URL + octet-stream works for private repos; the browser URL needs a public repo.
+    downloadUrl: token ? asset.url : asset.browser_download_url,
+    downloadHeaders: token ? { ...auth, Accept: 'application/octet-stream' } : undefined,
     notes: typeof release.body === 'string' ? release.body : null,
   };
 }
@@ -91,7 +106,7 @@ export async function backupThenDownloadAndInstall(update: UpdateInfo): Promise<
   if (destination.exists) {
     destination.delete();
   }
-  const downloaded = await File.downloadFileAsync(update.downloadUrl, destination);
+  const downloaded = await File.downloadFileAsync(update.downloadUrl, destination, { headers: update.downloadHeaders });
 
   await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
     data: downloaded.contentUri,

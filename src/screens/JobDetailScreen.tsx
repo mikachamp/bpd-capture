@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
+import { onSyncedData } from '../sync/syncService';
 import { format } from 'date-fns';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -76,6 +77,8 @@ export function JobDetailScreen({ route, navigation }: Props) {
       reload();
     }, [reload])
   );
+
+  useFocusEffect(useCallback(() => onSyncedData(() => void reload()), [reload]));
 
   const handleStatusChange = async (status: OrderStatus) => {
     await updateOrderStatus(orderId, status);

@@ -15,6 +15,7 @@ import {
   type UpdateInfo,
 } from '../services/appUpdate';
 import { colors, radius, spacing, typography } from '../theme/theme';
+import { SyncSettingsSection } from '../components/SyncSettingsSection';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'SettingsTab'>,
@@ -269,6 +270,8 @@ export function SettingsScreen({ navigation }: Props) {
                 {isRestoringBackup ? 'Restoring…' : '♻️ Restore from Backup'}
               </Text>
             </Pressable>
+
+            <SyncSettingsSection />
 
             <Text style={[styles.sectionLabel, styles.sectionSpacing]}>App Updates</Text>
             <Text style={styles.helperText}>

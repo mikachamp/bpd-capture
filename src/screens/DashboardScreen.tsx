@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
+import { onSyncedData } from '../sync/syncService';
 import { format } from 'date-fns';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -42,6 +43,9 @@ export function DashboardScreen({ navigation }: Props) {
       reload();
     }, [reload])
   );
+
+  // Jobs added or changed on the desktop appear without leaving the screen.
+  useFocusEffect(useCallback(() => onSyncedData(() => void reload()), [reload]));
 
   const handleDueDateChange = async (orderId: number, dueDate: string | null) => {
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, dueDate } : o)));

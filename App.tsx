@@ -8,6 +8,7 @@ import { bootstrapApp } from './src/App.bootstrap';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { StartupAnimation } from './src/components/StartupAnimation';
 import { saveStartupVideoOnce } from './src/services/brandVideo';
+import { startSync } from './src/sync/syncService';
 
 export default function App() {
   const [isBootstrapped, setIsBootstrapped] = useState(false);
@@ -28,6 +29,7 @@ export default function App() {
   useEffect(() => {
     if (!isBootstrapped || !isSplashDone) return;
     saveStartupVideoOnce().catch((error) => console.warn('Could not save the startup video:', error));
+    startSync().catch((error) => console.warn('Could not start sync:', error));
   }, [isBootstrapped, isSplashDone]);
 
   if (!isBootstrapped || !isSplashDone) {
