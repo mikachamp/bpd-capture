@@ -196,23 +196,30 @@ built-in one does nothing on Android, and content slid under the camera cutout).
 - **Overdue pulse:** overdue due-date chips gently pulse forever.
 - **Startup animation** — see below.
 
-### Startup animation — `components/StartupAnimation.tsx` + `startupAperture.ts`
-A real three.js scene (expo-gl on mobile, WebGL in Electron on desktop), full-screen on black,
-about 3.3 s:
-1. **0–1.1 s** — 35 dark blueprint panels (5×7 grid) fly in from scattered 3D positions and
-   lock into a job sheet, *behind a closed camera iris* (8 dark metal blades).
-2. **0.9–1.4 s** — a cyan CE-stamp ring with three tick marks spins into the top-right corner;
-   a purple frame fades in around the sheet.
-3. **1.3–2.8 s** — the iris opens: blades swing out, the ring widens 2× and blades fade to 30%
-   so the sheet is left fully clear.
-4. After that it "breathes" (slow iris rotation, panel bob) until the app is ready.
+### Startup animation — `components/StartupAnimation.tsx` + `startupLogoDraw.ts`
 
-Lighting: dim lavender key light plus cyan (`#4FC3F7`) and purple (`#7C4DFF`) rim lights that
-drift, standing in for the brand gradient. Wordmark "BPD Capture" + "Job site photo
-documentation" overlaid near the bottom (mobile: white; desktop: gradient text).
-The camera auto-fits the sheet to any screen shape. If 3D fails for any reason, the 3D view is
-dropped and the wordmark-only splash continues — **the splash must never be able to crash the app.**
-Concept gallery with the alternatives considered: `BPD_Capture_Desktop/loading-screen-concepts/index.html`.
+**"Pencil draws the logo"** (concept 7 in the gallery). A real three.js scene (expo-gl on
+mobile, WebGL in Electron on desktop), full-screen on the dark background, **no text**,
+3.5 s before the app opens:
+1. **0.25–1.75 s** — the logo's own pencil (light `#E9E9EE` bars, white tip) rides the mark's
+   outline, drawing a light-blue (`#9BD8F7`) guide line behind its tip.
+2. **1.3–2.4 s** — the colours pour in along the logo's real gradient directions: the blue arc
+   sweeps left to right, then the body rises purple → magenta → orange.
+3. **1.75–2.4 s** — the pencil slides home into its place in the logo and turns the logo's
+   near-black `#231F20`.
+4. **2.2–3.1 s** — the bulb flickers on: its interior fills with warm light that settles to
+   white, a soft glow blooms behind it, and the guide line fades.
+5. Meanwhile a slight 3D angle settles to exactly face-on, so the last frame is the logo.
+
+**Logo source:** `components/bpdLogoMark.ts` holds the mark's exact paths (from `BPT Logo.pdf`)
+and the gradient stops copied verbatim from `BPT Logo.svg` (blue `#0671B3`→`#2DA4DD`; body
+`#3E3C91`…`#E30E87`…`#F7B853`). Use the full-colour files, never the "Cutfile" versions, which
+are outline-only. The bulb interior (white paper in the printed logo) is the light here, and the
+graphite tip is white because a near-black tip vanishes on the dark background.
+
+The camera fits the mark to whichever screen axis is tighter. If 3D fails for any reason the
+splash ends immediately and the app opens — **the splash must never be able to crash the app.**
+Concepts considered: `BPD_Capture_Desktop/loading-screen-concepts/index.html`.
 
 ---
 
@@ -249,6 +256,7 @@ instead of a bottom tab bar, and a multi-column card grid. Same startup animatio
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-13 | 1.4.0 | Startup animation replaced with "Pencil draws the logo" using the real Blueprint Digital logo mark; wordmark text removed. Same on desktop. |
 | 2026-10-12 | 1.3.2 | Document created from the current code. |
 | 2026-10-06 | 1.3.2 | Startup animation made full-screen, auto-fitting, iris retracts and fades on open; calendar cells fixed to 1/7 width. |
 | 2026-10-01 | 1.3.0 | Three.js startup animation (iris + blueprint) replaced the 2D production-line splash. |
