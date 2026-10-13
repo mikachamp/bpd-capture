@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { File, Paths } from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Application from 'expo-application';
-import { exportBackup } from './backup';
+import { createLocalBackup } from './backup';
 
 /**
  * This app is sideloaded (no Play Store), so there is no store-level update
@@ -78,13 +78,14 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
 
 /**
  * Backs up current data first — per explicit requirement, an update never
- * proceeds without one — then downloads the new APK and hands off to
+ * proceeds without one. The backup is saved silently inside the app (no
+ * share sheet), then the new APK is downloaded and handed off to
  * Android's own package installer UI. Android requires the user to confirm
  * the install themselves; no app can silently replace itself, sideloaded or
  * not, so this is as close to "automatic" as the platform allows.
  */
 export async function backupThenDownloadAndInstall(update: UpdateInfo): Promise<void> {
-  await exportBackup();
+  await createLocalBackup();
 
   const destination = new File(Paths.cache, `bpd-capture-${update.tagName}.apk`);
   if (destination.exists) {

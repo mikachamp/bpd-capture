@@ -175,10 +175,10 @@ export function SettingsScreen({ navigation }: Props) {
       }
       Alert.alert(
         `Update available — ${update.tagName}`,
-        'This backs up your current data first, then downloads the update and hands off to Android to install it — you\'ll need to confirm the install yourself.',
+        'Your data is backed up automatically on this phone, then the update downloads and Android asks you to tap Install.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Back Up & Update', onPress: () => runUpdate(update) },
+          { text: 'Update Now', onPress: () => runUpdate(update) },
         ]
       );
     } catch (error) {

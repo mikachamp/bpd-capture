@@ -124,12 +124,13 @@ export async function renameOrderDirectory(oldCeNumber: string, newCeNumber: str
   await oldDir.move(newDir);
 }
 
-async function saveToGallery(fileUri: string): Promise<void> {
+/** Returns false (without throwing) when the user declines gallery access. */
+export async function saveToGallery(fileUri: string): Promise<boolean> {
   // Without granular permissions, Android 13+ also prompts for "music and
   // audio" access — alarming for a photo app, and never needed here.
   const permission = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
   if (permission.status !== 'granted') {
-    return;
+    return false;
   }
 
   // Write straight into the album. Creating the asset elsewhere and then moving
@@ -141,4 +142,5 @@ async function saveToGallery(fileUri: string): Promise<void> {
   } else {
     await MediaLibrary.createAlbumAsync(GALLERY_ALBUM_NAME, undefined, undefined, fileUri);
   }
+  return true;
 }

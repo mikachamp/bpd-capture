@@ -35,6 +35,44 @@ function freshStagingDirectory(name: string): Directory {
   return dir;
 }
 
+const LOCAL_BACKUPS_TO_KEEP = 3;
+
+function getLocalBackupsDirectory(): Directory {
+  return new Directory(Paths.document, 'BPD_Capture', 'backups');
+}
+
+/** Zips the SQLite database and every job's photos/videos into `zipFile`. */
+async function buildBackupZip(zipFile: File, password?: string): Promise<void> {
+  const staging = freshStagingDirectory('bpd_backup_staging');
+  try {
+    const dbFile = getDbFile();
+    if (dbFile.exists) {
+      await dbFile.copy(new File(staging, DB_FILE_NAME));
+    }
+    const ordersDir = getOrdersDirectory();
+    if (ordersDir.exists) {
+      await ordersDir.copy(new Directory(staging, ORDERS_DIR_NAME));
+    }
+
+    if (zipFile.exists) {
+      zipFile.delete();
+    }
+    if (password) {
+      await zipWithPassword(staging.uri, zipFile.uri, password);
+    } else {
+      await zip(staging.uri, zipFile.uri);
+    }
+  } finally {
+    if (staging.exists) {
+      staging.delete();
+    }
+  }
+}
+
+function backupFileName(): string {
+  return `bpd-capture-backup-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.zip`;
+}
+
 /**
  * Bundles the SQLite database and every job's photos/videos into a single
  * .zip and opens the share sheet so it can be saved off-device (Drive, USB
@@ -48,40 +86,48 @@ export async function exportBackup(password?: string): Promise<void> {
     throw new Error('Backup export requires on-device file access and only works in the installed app.');
   }
 
-  const staging = freshStagingDirectory('bpd_backup_staging');
-  try {
-    const dbFile = getDbFile();
-    if (dbFile.exists) {
-      await dbFile.copy(new File(staging, DB_FILE_NAME));
-    }
-    const ordersDir = getOrdersDirectory();
-    if (ordersDir.exists) {
-      await ordersDir.copy(new Directory(staging, ORDERS_DIR_NAME));
-    }
+  const zipFile = new File(Paths.cache, backupFileName());
+  await buildBackupZip(zipFile, password);
 
-    const zipFile = new File(Paths.cache, `bpd-capture-backup-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.zip`);
-    if (zipFile.exists) {
-      zipFile.delete();
-    }
-    if (password) {
-      await zipWithPassword(staging.uri, zipFile.uri, password);
-    } else {
-      await zip(staging.uri, zipFile.uri);
-    }
-
-    const canShare = await Sharing.isAvailableAsync();
-    if (!canShare) {
-      throw new Error('Sharing is not available on this device.');
-    }
-    await Sharing.shareAsync(zipFile.uri, {
-      mimeType: 'application/zip',
-      dialogTitle: 'Save BPD Capture backup',
-    });
-  } finally {
-    if (staging.exists) {
-      staging.delete();
-    }
+  const canShare = await Sharing.isAvailableAsync();
+  if (!canShare) {
+    throw new Error('Sharing is not available on this device.');
   }
+  await Sharing.shareAsync(zipFile.uri, {
+    mimeType: 'application/zip',
+    dialogTitle: 'Save BPD Capture backup',
+  });
+}
+
+/**
+ * Same zip as `exportBackup`, but kept silently in the app's own storage
+ * (no share sheet) — used right before an in-app update so updating is one
+ * tap. App storage survives an update-install, so this protects against a
+ * bad update, not against uninstalling; the manual backup still covers that.
+ * Only the newest few are kept so they don't pile up.
+ */
+export async function createLocalBackup(): Promise<string> {
+  if (isWeb) {
+    throw new Error('Backup requires on-device file access and only works in the installed app.');
+  }
+
+  const backupsDir = getLocalBackupsDirectory();
+  if (!backupsDir.exists) {
+    backupsDir.create({ intermediates: true });
+  }
+  const zipFile = new File(backupsDir, backupFileName());
+  await buildBackupZip(zipFile);
+
+  const older = backupsDir
+    .list()
+    .filter((entry): entry is File => entry instanceof File && entry.name.endsWith('.zip'))
+    .sort((a, b) => b.name.localeCompare(a.name))
+    .slice(LOCAL_BACKUPS_TO_KEEP);
+  for (const file of older) {
+    file.delete();
+  }
+
+  return zipFile.uri;
 }
 
 /**

@@ -2,7 +2,7 @@
   "expo": {
     "name": "BPD Capture",
     "slug": "bpd-capture",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,7 +11,7 @@
     },
     "android": {
       "package": "com.blueprintdigital.bpdcapture",
-      "versionCode": 7,
+      "versionCode": 8,
       "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
