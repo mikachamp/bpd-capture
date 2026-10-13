@@ -196,6 +196,52 @@ built-in one does nothing on Android, and content slid under the camera cutout).
 - **Overdue pulse:** overdue due-date chips gently pulse forever.
 - **Startup animation** — see below.
 
+### Brand animation protocol — follow this for any new logo, splash or brand animation
+
+These rules come from the owner's feedback while the startup animation was designed (several
+rounds were rejected before concept 7). Apply them to any similar request, on mobile or
+desktop.
+
+**What to make**
+1. **Use the real brand artwork.** Start from the full-colour logo files
+   (`Documents\3D Printing\Jobs\2026\BluePrint_Digital\BPT Logo.pdf` / `.svg`), never the
+   "Cutfile" versions (outline only) and never a redrawn guess. Extract the exact paths and the
+   exact gradient stops; don't approximate colours.
+2. **The last frame is the logo, exactly.** Same shape, same colours, face-on. The animation is
+   judged on whether it ends looking identical to the printed logo.
+3. **One idea per animation.** Don't blend two concepts into one scene (the iris + blueprint
+   mix was rejected for this). The story should come from the brand itself; for BPD that's
+   the bulb lighting up and the pencil drawing.
+4. **No text and no container.** No wordmark, captions or tagline, and no rounded square or
+   tile behind the mark. Just the logo on the dark background (`colors.dark`).
+5. **Real 3D, not a flat video.** Use a three.js scene with depth, light and a slight camera
+   angle that settles face-on, so it feels interactive rather than a 2D clip.
+6. **Avoid clichés.** Generic three.js demos (spinning torus knots, particle swirls, network
+   meshes) were rejected as boring. Make it specific to this business.
+7. **Short.** About 3–3.5 s before the app opens. It must never delay real work.
+
+**How to build it**
+1. **Offer options first.** Prototype several concepts side by side in the gallery
+   (`BPD_Capture_Desktop/loading-screen-concepts/index.html`, also published as a
+   clickable page) and let the owner pick one before touching the apps. Don't build anything
+   until a concept is chosen.
+2. **One shared scene module** (`startupLogoDraw.ts` style): `buildScene(aspect)` returns
+   `{ scene, camera, tick(t), dispose }`, with `tick` a pure function of time. The same file is
+   copied into the desktop app, and the deterministic `tick` is what makes video export
+   possible.
+3. **Fit to any screen.** The camera fits the mark to the tighter screen axis; the view is
+   full-screen (`StyleSheet.absoluteFill`) so nothing is clipped by a visible box.
+4. **It can never crash the app.** Wrap renderer creation and every frame in try/catch; on any
+   failure, end the splash immediately and open the app. Keep the expo-gl WebGL fix in
+   `utils/expoThreeRenderer.ts`.
+
+**How to check it**
+1. Render frames at fixed times and compare the final frame against the logo file.
+2. Test on the Android emulator with the **release** APK and take screenshots. Web preview
+   cannot validate expo-gl.
+3. Re-render the video (`scripts/startup-video/README.md`) and update this section and the
+   Changelog in the same change.
+
 ### Startup animation — `components/StartupAnimation.tsx` + `startupLogoDraw.ts`
 
 **"Pencil draws the logo"** (concept 7 in the gallery). A real three.js scene (expo-gl on
