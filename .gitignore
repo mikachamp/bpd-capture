@@ -43,3 +43,4 @@ yarn-error.*
 # local APK builds
 /builds
 *.apk
+/scripts/startup-video/out

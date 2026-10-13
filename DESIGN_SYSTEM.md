@@ -221,6 +221,12 @@ The camera fits the mark to whichever screen axis is tighter. If 3D fails for an
 splash ends immediately and the app opens — **the splash must never be able to crash the app.**
 Concepts considered: `BPD_Capture_Desktop/loading-screen-concepts/index.html`.
 
+**Video export:** `assets/bpd-startup-animation.mp4` (1080×1920, 60 fps, 4.5 s, H.264) is
+rendered frame-by-frame from this same `startupLogoDraw.ts`, so it matches the app exactly.
+`services/brandVideo.ts` saves it to the gallery ("BPD Capture" album, as
+"BPD Startup Animation.mp4") once, after the splash on first launch. **If the animation
+changes, re-render the video** (steps in `SESSION_HANDOFF.md`).
+
 ---
 
 ## 8. Field report PDF — `services/reportPdf.ts`

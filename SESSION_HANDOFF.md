@@ -4,6 +4,34 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
+## TL;DR — current state (2026-10-13, logo splash + one-tap updates, v1.4.1)
+
+1. **v1.4.0 — new startup animation**: "Pencil draws the logo" using the real Blueprint Digital
+   mark (`src/components/startupLogoDraw.ts` + `bpdLogoMark.ts`; same files in the desktop app).
+   Details and logo-source rules are in `DESIGN_SYSTEM.md` §7. The iris+blueprint scene
+   (`startupAperture.ts`) is deleted.
+2. **v1.4.1 — update button no longer asks you to save a zip.** The updater used
+   `exportBackup()`, which ends in the share sheet, so users thought they had to download the
+   backup themselves. Now `backup.ts` has `createLocalBackup()` (same zip, saved silently to
+   `files/BPD_Capture/backups/`, newest 3 kept) and `appUpdate.ts` uses it. `exportBackup()` is
+   still used by the manual "Create Full Backup" button. Android still requires one
+   **Update/Install** tap; nothing can skip that for a sideloaded app.
+   - Updating **from 1.4.0** still shows the old share sheet once (old code). Pressing back
+     lets the update continue — verified on the emulator.
+   - The first time, Android may show "isn't allowed to install unknown apps". After allowing
+     it, the installer can drop the session; tapping Update Now again works.
+3. **v1.4.1 — startup video in the gallery.** `assets/bpd-startup-animation.mp4` is rendered
+   from the scene code (`scripts/startup-video/README.md` has the steps). `services/brandVideo.ts`
+   saves it once after the splash as "BPD Startup Animation.mp4" in the "BPD Capture" album
+   (copy to a named file first, otherwise the gallery shows `ExponentAsset-<hash>.mp4`).
+   `saveToGallery` in `storage.ts` now returns `false` when permission is declined, so the save
+   is retried next launch.
+4. **How the update path was tested end to end**: publish the real release first, then build the
+   same code with `versionCode 7` / `versionName "1.4.0"` edited straight into
+   `C:/dev/bpd/android/app/build.gradle` (incremental build, ~1 min), `adb uninstall` +
+   install it, and run Check for Updates against GitHub. Put build.gradle back afterwards.
+5. Releases now carry `bpd2.apk`, `bpd2.zip` and (from 1.4.1) the video. Next versionCode: **9**.
+
 ## TL;DR — current state (2026-10-06, startup crash fix + native test pass, v1.3.2)
 
 **User reported v1.3.1 crashing on startup** (phone not available to plug in). Fixed and
