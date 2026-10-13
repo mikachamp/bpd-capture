@@ -1,5 +1,6 @@
 // Path separators, Windows-reserved characters and control characters.
-const UNSAFE_CHARS = /[/\:*?"<>|\u0000-\u001f]/g;
+// \x5c is a backslash (written as an escape so tooling can't collapse it).
+const UNSAFE_CHARS = /[/\x5c:*?"<>|\u0000-\u001f]/g;
 
 /**
  * Normalizes a CE number for use both as the DB unique key and as a filesystem
