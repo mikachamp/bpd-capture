@@ -11,7 +11,7 @@ import { listOrdersWithDueDate } from '../db/orders';
 import type { Order } from '../types/models';
 import { buildWeekDays } from '../utils/calendarGrid';
 import { MonthCalendarBoard } from '../components/MonthCalendarBoard';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'CalendarTab'>,
@@ -95,14 +95,14 @@ export function CalendarScreen({ navigation, route }: Props) {
               dotTone={(dayOrders, day) =>
                 dayOrders.some((o) => o.status === 'in_process' && day < today) ? 'danger' : 'accent'
               }
-              onPressOrder={(id) => navigation.navigate('JobDetail', { orderId: id })}
+              onPressOrder={(id) => navigation.navigate('Order', { orderId: id })}
               emptyLabel="No jobs due this month."
             />
           ) : (
             <WeekList
               cursor={cursor}
               jobsForDay={jobsForDay}
-              onPressOrder={(id) => navigation.navigate('JobDetail', { orderId: id })}
+              onPressOrder={(id) => navigation.navigate('Order', { orderId: id })}
             />
           )}
         </View>
@@ -178,6 +178,7 @@ const styles = StyleSheet.create({
   },
   backLink: {
     color: colors.accent,
+    fontFamily: fonts.family,
     fontSize: 18,
     fontWeight: '700',
     paddingVertical: spacing.xs,
@@ -206,6 +207,7 @@ const styles = StyleSheet.create({
   modeOptionText: {
     fontWeight: '700',
     color: colors.textSecondary,
+    fontFamily: fonts.family,
     fontSize: 13,
   },
   modeOptionTextActive: {
@@ -219,6 +221,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
   },
   navArrow: {
+    fontFamily: fonts.family,
     fontSize: 26,
     color: colors.accent,
     fontWeight: '600',
@@ -266,6 +269,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.successTint,
   },
   jobRowBadgeText: {
+    fontFamily: fonts.family,
     fontSize: 11,
     fontWeight: '700',
     color: colors.textPrimary,
@@ -293,6 +297,7 @@ const styles = StyleSheet.create({
   },
   todayTagText: {
     color: colors.accent,
+    fontFamily: fonts.family,
     fontSize: 11,
     fontWeight: '700',
   },

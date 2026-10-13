@@ -6,7 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { addClient, deleteClient, listClients } from '../db/clients';
 import type { Client } from '../types/models';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Clients'>;
 
@@ -117,6 +117,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+    fontFamily: fonts.family,
     fontSize: 15,
     color: colors.textPrimary,
   },
@@ -154,6 +155,7 @@ const styles = StyleSheet.create({
   removeText: {
     color: colors.danger,
     fontWeight: '600',
+    fontFamily: fonts.family,
     fontSize: 13,
   },
   empty: {

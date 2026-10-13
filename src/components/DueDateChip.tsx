@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { format, isBefore, isToday, startOfDay } from 'date-fns';
-import { colors, radius, spacing } from '../theme/theme';
+import { colors, fonts, radius, spacing } from '../theme/theme';
 import { DueDateCalendarModal } from './DueDateCalendarModal';
 
 type Props = {
@@ -124,10 +124,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dangerTint,
   },
   text: {
+    fontFamily: fonts.family,
     fontSize: 12,
     fontWeight: '700',
   },
   textFull: {
+    fontFamily: fonts.family,
     fontSize: 14,
   },
   textMuted: {
@@ -150,6 +152,7 @@ const styles = StyleSheet.create({
   },
   addBadgeText: {
     color: colors.textOnDark,
+    fontFamily: fonts.family,
     fontSize: 11,
     fontWeight: '700',
   },

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { addMonths, format, isSameDay, isSameMonth, isToday, subMonths } from 'date-fns';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 import { buildMonthGridDays } from '../utils/calendarGrid';
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -115,6 +115,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   navArrow: {
+    fontFamily: fonts.family,
     fontSize: 24,
     color: colors.accent,
     paddingHorizontal: spacing.sm,
@@ -130,6 +131,7 @@ const styles = StyleSheet.create({
     width: SEVENTH,
     textAlign: 'center',
     ...typography.label,
+    fontFamily: fonts.family,
     fontSize: 11,
   },
   grid: {
@@ -153,6 +155,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   dayText: {
+    fontFamily: fonts.family,
     fontSize: 14,
     fontWeight: '600',
     color: colors.textPrimary,
@@ -182,6 +185,7 @@ const styles = StyleSheet.create({
   noDueDateText: {
     color: colors.danger,
     fontWeight: '600',
+    fontFamily: fonts.family,
     fontSize: 14,
   },
   cancelButton: {
@@ -191,6 +195,7 @@ const styles = StyleSheet.create({
   cancelText: {
     color: colors.textSecondary,
     fontWeight: '600',
+    fontFamily: fonts.family,
     fontSize: 14,
   },
 });

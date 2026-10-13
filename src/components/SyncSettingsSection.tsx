@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatDistanceToNow } from 'date-fns';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 import { beginSignIn, finishSignIn, getSyncStatus, onSyncStatus, signOut, syncNow, type SyncStatus } from '../sync/syncService';
 import type { DeviceCode } from '../sync/syncCore';
 
@@ -99,7 +99,7 @@ export function SyncSettingsSection() {
 
 const styles = StyleSheet.create({
   sectionLabel: { ...typography.label },
-  helperText: { ...typography.caption, fontSize: 12, lineHeight: 17 },
+  helperText: { ...typography.caption, fontFamily: fonts.family, fontSize: 12, lineHeight: 17 },
   fieldSpacing: { marginTop: spacing.sm },
   sectionSpacing: { marginTop: spacing.xl },
   secondaryButton: {
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: 'center',
   },
-  secondaryButtonText: { color: colors.textPrimary, fontWeight: '700', fontSize: 15 },
+  secondaryButtonText: { color: colors.textPrimary, fontWeight: '700', fontFamily: fonts.family, fontSize: 15 },
   codeBox: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   code: { color: colors.textPrimary, fontSize: 30, fontWeight: '700', letterSpacing: 4, textAlign: 'center', paddingVertical: spacing.sm },
   link: { color: colors.accent, fontSize: 14, fontWeight: '600', textAlign: 'center' },

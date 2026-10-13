@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 
 type Props = {
   label: string;
@@ -76,6 +76,7 @@ const styles = StyleSheet.create({
     ...typography.subtitle,
   },
   percentText: {
+    fontFamily: fonts.family,
     fontSize: 20,
     fontWeight: '800',
     color: colors.textPrimary,

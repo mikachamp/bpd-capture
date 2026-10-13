@@ -9,7 +9,7 @@ import { listAllCompletedOrders } from '../db/orders';
 import type { Order } from '../types/models';
 import { type BucketOption, getAvailableYears, getMonthsInYear } from '../services/dateGrouping';
 import { MonthCalendarBoard } from '../components/MonthCalendarBoard';
-import { colors, spacing, typography } from '../theme/theme';
+import { colors, fonts, spacing, typography } from '../theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'BrowseByDate'>;
 
@@ -93,7 +93,7 @@ export function BrowseByDateScreen({ navigation }: Props) {
               dotTone={(dayOrders) =>
                 dayOrders.some((o) => o.dueDate && completedDateKey(o)! > o.dueDate) ? 'danger' : 'success'
               }
-              onPressOrder={(id) => navigation.navigate('JobDetail', { orderId: id })}
+              onPressOrder={(id) => navigation.navigate('Order', { orderId: id })}
               emptyLabel="No completed orders this month."
             />
           </View>
@@ -121,12 +121,14 @@ const styles = StyleSheet.create({
   },
   backLink: {
     color: colors.accent,
+    fontFamily: fonts.family,
     fontSize: 18,
     fontWeight: '700',
     paddingVertical: spacing.xs,
   },
   title: {
     ...typography.title,
+    fontFamily: fonts.family,
     fontSize: 20,
   },
   scroll: {
@@ -147,10 +149,12 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   bucketLabel: {
+    fontFamily: fonts.family,
     fontSize: 16,
     color: colors.textPrimary,
   },
   bucketCount: {
+    fontFamily: fonts.family,
     fontSize: 14,
     color: colors.textSecondary,
   },

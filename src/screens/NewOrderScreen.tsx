@@ -8,7 +8,7 @@ import { addClient, listClients } from '../db/clients';
 import type { Client } from '../types/models';
 import { isValidCeNumber } from '../utils/ceNumber';
 import { DueDateChip } from '../components/DueDateChip';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'NewOrder'>;
 
@@ -48,13 +48,13 @@ export function NewOrderScreen({ navigation }: Props) {
         // suggestions without blocking navigation into the new job.
         addClient(trimmedClient).catch(() => {});
       }
-      navigation.replace('JobDetail', { orderId: order.id });
+      navigation.replace('Order', { orderId: order.id });
     } catch (error) {
       if (error instanceof DuplicateCeNumberError) {
         const existing = await getOrderByCe(ceNumber);
         if (existing) {
           Alert.alert('CE already exists', `Opening the existing order for ${existing.ceNumber}.`, [
-            { text: 'OK', onPress: () => navigation.replace('JobDetail', { orderId: existing.id }) },
+            { text: 'OK', onPress: () => navigation.replace('Order', { orderId: existing.id }) },
           ]);
           return;
         }
@@ -198,6 +198,7 @@ const styles = StyleSheet.create({
   },
   suggestionText: {
     color: colors.textPrimary,
+    fontFamily: fonts.family,
     fontSize: 15,
   },
   input: {
@@ -207,6 +208,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+    fontFamily: fonts.family,
     fontSize: 18,
     color: colors.textPrimary,
   },
@@ -223,11 +225,13 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.textOnDark,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 16,
   },
   headerSaveText: {
     color: colors.accent,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 16,
     paddingHorizontal: spacing.sm,
   },

@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { cardShadow, colors, radius, spacing, typography } from '../theme/theme';
+import { cardShadow, colors, fonts, radius, spacing, typography } from '../theme/theme';
 
 type Tone = 'neutral' | 'warning' | 'danger';
 
@@ -52,6 +52,7 @@ const styles = StyleSheet.create({
     ...typography.label,
   },
   value: {
+    fontFamily: fonts.family,
     fontSize: 28,
     fontWeight: '800',
     color: colors.textPrimary,
@@ -65,6 +66,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...typography.caption,
+    fontFamily: fonts.family,
     fontSize: 12,
   },
 });

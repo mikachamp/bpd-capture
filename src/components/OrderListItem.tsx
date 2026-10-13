@@ -2,7 +2,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { format } from 'date-fns';
 import type { Order } from '../types/models';
-import { cardShadow, colors, radius, spacing, typography } from '../theme/theme';
+import { cardShadow, colors, fonts, radius, spacing, typography } from '../theme/theme';
 import { DueDateChip } from './DueDateChip';
 import { usePressScale } from '../utils/usePressScale';
 
@@ -54,7 +54,6 @@ export function OrderListItem({ order, onPress, onDueDateChange }: Props) {
         <View style={styles.info}>
           <View style={styles.ceNumberRow}>
             <Text style={styles.ceNumber} numberOfLines={1}>{heading}</Text>
-            {order.notes ? <Text style={styles.noteIcon}>📝</Text> : null}
           </View>
           <Text style={styles.clientLine} numberOfLines={1}>{metaLine}</Text>
           <Text style={styles.dateLabel} numberOfLines={1}>{dateLabel}</Text>
@@ -121,6 +120,7 @@ const styles = StyleSheet.create({
   avatarFallbackText: {
     color: colors.textOnDark,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 16,
   },
   info: {
@@ -136,9 +136,11 @@ const styles = StyleSheet.create({
     ...typography.title,
   },
   noteIcon: {
+    fontFamily: fonts.family,
     fontSize: 13,
   },
   clientLine: {
+    fontFamily: fonts.family,
     fontSize: 13,
     fontWeight: '600',
     color: colors.textSecondary,
@@ -161,6 +163,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.successTint,
   },
   badgeText: {
+    fontFamily: fonts.family,
     fontSize: 12,
     fontWeight: '700',
     color: colors.textPrimary,
@@ -181,11 +184,13 @@ const styles = StyleSheet.create({
   viewMoreText: {
     color: colors.accent,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 13,
   },
   viewMoreChevron: {
     color: colors.accent,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 16,
     marginTop: -1,
   },

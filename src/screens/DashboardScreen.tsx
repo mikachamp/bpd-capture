@@ -15,7 +15,7 @@ import { exportAndShareDailyDigest } from '../services/reportPdf';
 import type { Order } from '../types/models';
 import { OrderListItem } from '../components/OrderListItem';
 import { AppLogo } from '../components/AppLogo';
-import { colors, gradientAccent, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, gradientAccent, radius, spacing, typography } from '../theme/theme';
 import { usePressScale } from '../utils/usePressScale';
 
 type Props = CompositeScreenProps<
@@ -145,7 +145,7 @@ export function DashboardScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <OrderListItem
             order={item}
-            onPress={() => navigation.navigate('JobDetail', { orderId: item.id })}
+            onPress={() => navigation.navigate('Order', { orderId: item.id })}
             onDueDateChange={(dueDate) => handleDueDateChange(item.id, dueDate)}
           />
         )}
@@ -158,7 +158,7 @@ export function DashboardScreen({ navigation }: Props) {
                 disabled={isSendingDigest}
               >
                 <Text style={styles.actionButtonText}>
-                  {isSendingDigest ? 'Preparing digest…' : '📨 Send Daily Digest'}
+                  {isSendingDigest ? 'Preparing digest…' : 'Send Daily Digest'}
                 </Text>
               </Pressable>
             </View>
@@ -285,6 +285,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontWeight: '700',
     color: colors.textPrimary,
+    fontFamily: fonts.family,
     fontSize: 13,
     textAlign: 'center',
   },
@@ -325,6 +326,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   fabText: {
+    fontFamily: fonts.family,
     fontSize: 32,
     color: colors.textOnDark,
     lineHeight: 36,

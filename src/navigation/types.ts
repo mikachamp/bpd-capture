@@ -1,4 +1,5 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { Stage } from '../types/models';
 
 export type MainTabParamList = {
   DashboardTab: undefined;
@@ -10,8 +11,11 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<MainTabParamList>;
   NewOrder: undefined;
+  Order: { orderId: number };
+  PickJob: undefined;
   JobDetail: { orderId: number };
-  Capture: { orderId: number; ceNumber: string };
+  /** stage: which stage new shots are filed under (defaults to Sample). */
+  Capture: { orderId: number; ceNumber: string; stage?: Stage };
   BrowseByDate: undefined;
   SearchByCe: undefined;
   SearchByClient: undefined;

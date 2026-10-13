@@ -14,7 +14,7 @@ import {
   openInstallPermissionSettings,
   type UpdateInfo,
 } from '../services/appUpdate';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 import { SyncSettingsSection } from '../components/SyncSettingsSection';
 
 type Props = CompositeScreenProps<
@@ -194,7 +194,7 @@ export function SettingsScreen({ navigation }: Props) {
     navigation.setOptions({
       headerRight: () => (
         <Pressable onPress={handleSave} hitSlop={8}>
-          <Text style={styles.headerSaveText}>{justSaved ? 'Saved ✓' : 'Save'}</Text>
+          <Text style={styles.headerSaveText}>{justSaved ? 'Saved' : 'Save'}</Text>
         </Pressable>
       ),
     });
@@ -218,7 +218,7 @@ export function SettingsScreen({ navigation }: Props) {
               style={[styles.secondaryButton, styles.fieldSpacing]}
               onPress={() => navigation.navigate('Clients')}
             >
-              <Text style={styles.secondaryButtonText}>👥 Manage Clients</Text>
+              <Text style={styles.secondaryButtonText}>Manage Clients</Text>
             </Pressable>
 
             <Text style={[styles.sectionLabel, styles.sectionSpacing]}>Dispatcher Contact</Text>
@@ -258,7 +258,7 @@ export function SettingsScreen({ navigation }: Props) {
               disabled={isExportingBackup}
             >
               <Text style={styles.secondaryButtonText}>
-                {isExportingBackup ? 'Preparing backup…' : '📦 Create Full Backup'}
+                {isExportingBackup ? 'Preparing backup…' : 'Create Full Backup'}
               </Text>
             </Pressable>
             <Pressable
@@ -267,7 +267,7 @@ export function SettingsScreen({ navigation }: Props) {
               disabled={isRestoringBackup}
             >
               <Text style={styles.secondaryButtonText}>
-                {isRestoringBackup ? 'Restoring…' : '♻️ Restore from Backup'}
+                {isRestoringBackup ? 'Restoring…' : 'Restore from Backup'}
               </Text>
             </Pressable>
 
@@ -289,7 +289,7 @@ export function SettingsScreen({ navigation }: Props) {
                   ? 'Backing up & downloading…'
                   : isCheckingUpdate
                     ? 'Checking…'
-                    : '🔄 Check for Updates'}
+                    : 'Check for Updates'}
               </Text>
             </Pressable>
           </View>
@@ -360,6 +360,7 @@ const styles = StyleSheet.create({
   },
   helperText: {
     ...typography.caption,
+    fontFamily: fonts.family,
     fontSize: 12,
     lineHeight: 17,
   },
@@ -385,6 +386,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: colors.textPrimary,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 15,
   },
   input: {
@@ -394,6 +396,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+    fontFamily: fonts.family,
     fontSize: 16,
     color: colors.textPrimary,
   },
@@ -407,11 +410,13 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.textOnDark,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 16,
   },
   headerSaveText: {
     color: colors.accent,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 16,
     paddingHorizontal: spacing.sm,
   },

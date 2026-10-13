@@ -4,7 +4,7 @@ import { format, isSameMonth, isToday } from 'date-fns';
 import type { Order } from '../types/models';
 import { buildMonthGridDays } from '../utils/calendarGrid';
 import { groupOrdersByWeekInMonth } from '../utils/groupOrdersByWeek';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAY_SIZE = 40;
@@ -149,6 +149,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   navArrow: {
+    fontFamily: fonts.family,
     fontSize: 24,
     color: colors.accent,
     fontWeight: '600',
@@ -172,6 +173,7 @@ const styles = StyleSheet.create({
     width: SEVENTH,
     textAlign: 'center',
     ...typography.label,
+    fontFamily: fonts.family,
     fontSize: 11,
   },
   gridDays: {
@@ -195,6 +197,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentTint,
   },
   dayText: {
+    fontFamily: fonts.family,
     fontSize: 14,
     fontWeight: '600',
     color: colors.textPrimary,
@@ -276,6 +279,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dangerTint,
   },
   tagText: {
+    fontFamily: fonts.family,
     fontSize: 11,
     fontWeight: '700',
   },

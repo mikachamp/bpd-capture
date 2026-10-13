@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type { MediaItem } from '../types/models';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 
 const MIN_THUMB_SIZE = 82;
 const THUMB_GAP = 8;
@@ -158,7 +158,7 @@ export function MediaGrid({ media, onRename, onDelete, footer }: Props) {
   );
 }
 
-function MediaPreview({ item, onClose }: { item: MediaItem; onClose: () => void }) {
+export function MediaPreview({ item, onClose }: { item: MediaItem; onClose: () => void }) {
   const player = useVideoPlayer(item.type === 'video' ? item.filePath : null, (instance) => {
     instance.play();
   });
@@ -212,10 +212,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   videoIcon: {
+    fontFamily: fonts.family,
     fontSize: 24,
     color: colors.textSecondary,
   },
   videoLabel: {
+    fontFamily: fonts.family,
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 4,
@@ -233,6 +235,7 @@ const styles = StyleSheet.create({
   },
   moreButtonText: {
     color: colors.textOnDark,
+    fontFamily: fonts.family,
     fontSize: 14,
     fontWeight: '700',
     marginTop: -6,
@@ -324,6 +327,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    fontFamily: fonts.family,
     fontSize: 16,
     color: colors.textPrimary,
   },

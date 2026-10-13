@@ -11,7 +11,7 @@ import { listAllCompletedOrders, listInProcessOrders } from '../db/orders';
 import type { Order } from '../types/models';
 import { StatTile } from '../components/StatTile';
 import { Meter } from '../components/Meter';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'InsightsTab'>,
@@ -102,7 +102,7 @@ export function InsightsScreen({ navigation }: Props) {
                 <Pressable
                   key={order.id}
                   style={styles.jobRow}
-                  onPress={() => navigation.navigate('JobDetail', { orderId: order.id })}
+                  onPress={() => navigation.navigate('Order', { orderId: order.id })}
                 >
                   <Text style={styles.jobRowCe} numberOfLines={1}>{order.ceNumber}</Text>
                   <Text style={styles.jobRowDue}>Due {format(new Date(`${order.dueDate}T00:00:00`), 'MMM d')}</Text>
@@ -138,6 +138,7 @@ const styles = StyleSheet.create({
   },
   backLink: {
     color: colors.accent,
+    fontFamily: fonts.family,
     fontSize: 18,
     fontWeight: '700',
     paddingVertical: spacing.xs,

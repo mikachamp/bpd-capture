@@ -6,7 +6,7 @@ import type { RootStackParamList } from '../navigation/types';
 import { searchByCe } from '../db/orders';
 import type { Order } from '../types/models';
 import { OrderListItem } from '../components/OrderListItem';
-import { colors, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SearchByCe'>;
 
@@ -54,7 +54,7 @@ export function SearchByCeScreen({ navigation }: Props) {
         keyExtractor={(item) => String(item.id)}
         style={styles.list}
         renderItem={({ item }) => (
-          <OrderListItem order={item} onPress={() => navigation.navigate('JobDetail', { orderId: item.id })} />
+          <OrderListItem order={item} onPress={() => navigation.navigate('Order', { orderId: item.id })} />
         )}
         ListEmptyComponent={
           searched ? <Text style={styles.emptyText}>No orders match "{query}".</Text> : null
@@ -95,6 +95,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+    fontFamily: fonts.family,
     fontSize: 18,
     color: colors.textPrimary,
   },

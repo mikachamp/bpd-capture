@@ -39,7 +39,7 @@ import type { MediaItem, Order, OrderStatus } from '../types/models';
 import { MediaGrid } from '../components/MediaGrid';
 import { StatusToggle } from '../components/StatusToggle';
 import { DueDateChip } from '../components/DueDateChip';
-import { colors, gradientAccent, radius, spacing, typography } from '../theme/theme';
+import { colors, fonts, gradientAccent, radius, spacing, typography } from '../theme/theme';
 import { usePressScale } from '../utils/usePressScale';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'JobDetail'>;
@@ -228,7 +228,7 @@ export function JobDetailScreen({ route, navigation }: Props) {
       for (const asset of result.assets) {
         const type = asset.type === 'video' ? 'video' : 'photo';
         const saved = await saveCapturedMedia(order.ceNumber, asset.uri, type, { backupToGallery: false });
-        await addMediaItem(order.id, type, saved.filePath, saved.fileName);
+        await addMediaItem(order.id, type, saved.filePath, saved.fileName, order.stage);
       }
       await reload();
     } catch (error) {
@@ -313,16 +313,16 @@ export function JobDetailScreen({ route, navigation }: Props) {
         <View style={styles.actionRow}>
           <Pressable
             style={[styles.actionButton, styles.captureButton]}
-            onPress={() => navigation.navigate('Capture', { orderId: order.id, ceNumber: order.ceNumber })}
+            onPress={() => navigation.navigate('Capture', { orderId: order.id, ceNumber: order.ceNumber, stage: order.stage })}
           >
-            <Text style={styles.captureButtonText}>📷 Capture</Text>
+            <Text style={styles.captureButtonText}>Capture</Text>
           </Pressable>
           <Pressable
             style={[styles.actionButton, styles.uploadButton]}
             onPress={handleUploadFromGallery}
             disabled={isUploading}
           >
-            <Text style={styles.uploadButtonText}>{isUploading ? 'Uploading…' : '⬆ Upload from Gallery'}</Text>
+            <Text style={styles.uploadButtonText}>{isUploading ? 'Uploading…' : 'Upload from Gallery'}</Text>
           </Pressable>
         </View>
 
@@ -341,7 +341,7 @@ export function JobDetailScreen({ route, navigation }: Props) {
               style={styles.exportButton}
             >
               <Text style={styles.exportButtonText}>
-                {isExportingReport ? 'Preparing report…' : '📄 Export Field Report'}
+                {isExportingReport ? 'Preparing report…' : 'Export Field Report'}
               </Text>
             </LinearGradient>
           </Animated.View>
@@ -403,6 +403,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     ...typography.caption,
+    fontFamily: fonts.family,
     fontSize: 12,
     fontWeight: '700',
     color: colors.textSecondary,
@@ -414,6 +415,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    fontFamily: fonts.family,
     fontSize: 14,
     color: colors.textPrimary,
   },
@@ -430,6 +432,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    fontFamily: fonts.family,
     fontSize: 14,
     color: colors.textPrimary,
     textAlignVertical: 'top',
@@ -458,6 +461,7 @@ const styles = StyleSheet.create({
   exportButtonText: {
     color: colors.textOnDark,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 15,
   },
   captureButton: {
@@ -466,6 +470,7 @@ const styles = StyleSheet.create({
   captureButtonText: {
     color: colors.textOnDark,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 15,
   },
   uploadButton: {
@@ -474,6 +479,7 @@ const styles = StyleSheet.create({
   uploadButtonText: {
     color: colors.textPrimary,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 15,
   },
   sectionLabel: {
@@ -493,12 +499,14 @@ const styles = StyleSheet.create({
   deleteJobLinkText: {
     color: colors.danger,
     fontWeight: '600',
+    fontFamily: fonts.family,
     fontSize: 13,
     textAlign: 'center',
   },
   headerSaveText: {
     color: colors.accent,
     fontWeight: '700',
+    fontFamily: fonts.family,
     fontSize: 16,
     paddingHorizontal: spacing.sm,
   },

@@ -1,21 +1,36 @@
 import { useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, useMicrophonePermissions, type CameraMode } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { saveCapturedMedia } from '../services/storage';
 import { addMediaItem } from '../db/mediaItems';
+import type { PhotoSide, Stage } from '../types/models';
+import { STAGES } from '../utils/stages';
+import { Icon } from '../components/Icon';
+import { colors, fonts, radius, spacing } from '../theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Capture'>;
 
+/**
+ * Multi-shot camera. Stays open between shots (a typical job is 10–15
+ * photos), files every shot under the chosen stage, and on Installed pairs
+ * Before / After shots for the installation proof. Each shot is saved the
+ * moment it's taken, so closing never loses anything.
+ */
 export function CaptureScreen({ route, navigation }: Props) {
   const { orderId, ceNumber } = route.params;
+  const [stage, setStage] = useState<Stage>(route.params.stage ?? 0);
+  const [side, setSide] = useState<PhotoSide>('before');
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [microphonePermission, requestMicrophonePermission] = useMicrophonePermissions();
   const [mode, setMode] = useState<CameraMode>('picture');
   const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [count, setCount] = useState(0);
+  const [lastUri, setLastUri] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
   const discardNextRecording = useRef(false);
 
@@ -27,9 +42,7 @@ export function CaptureScreen({ route, navigation }: Props) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.permissionPrompt}>
-          <Text style={styles.permissionText}>
-            BPD Capture needs camera and microphone access to record job photos and videos.
-          </Text>
+          <Text style={styles.permissionText}>BPD Capture needs camera and microphone access to record job photos and videos.</Text>
           <Pressable
             style={styles.permissionButton}
             onPress={async () => {
@@ -37,7 +50,7 @@ export function CaptureScreen({ route, navigation }: Props) {
               await requestMicrophonePermission();
             }}
           >
-            <Text style={styles.permissionButtonText}>Grant Access</Text>
+            <Text style={styles.permissionButtonText}>Grant access</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -48,9 +61,13 @@ export function CaptureScreen({ route, navigation }: Props) {
     setIsSaving(true);
     try {
       const saved = await saveCapturedMedia(ceNumber, uri, type);
-      await addMediaItem(orderId, type, saved.filePath, saved.fileName);
-      navigation.goBack();
-    } catch (error) {
+      await addMediaItem(orderId, type, saved.filePath, saved.fileName, stage, stage === 3 ? side : null);
+      setCount((n) => n + 1);
+      if (type === 'photo') setLastUri(saved.filePath);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      // After a "before" shot in store, the natural next shot is its "after".
+      if (stage === 3 && side === 'before') setSide('after');
+    } catch {
       Alert.alert('Save failed', 'Could not save this capture. Please try again.');
     } finally {
       setIsSaving(false);
@@ -59,40 +76,29 @@ export function CaptureScreen({ route, navigation }: Props) {
 
   const handleShutterPress = async () => {
     if (isSaving) return;
-
     if (mode === 'picture') {
       const photo = await cameraRef.current?.takePictureAsync();
-      if (photo?.uri) {
-        await persistCapture(photo.uri, 'photo');
-      }
+      if (photo?.uri) await persistCapture(photo.uri, 'photo');
       return;
     }
-
     if (isRecording) {
       cameraRef.current?.stopRecording();
       return;
     }
-
     setIsRecording(true);
     const video = await cameraRef.current?.recordAsync();
     setIsRecording(false);
-
     if (discardNextRecording.current) {
       discardNextRecording.current = false;
-      navigation.goBack();
       return;
     }
-
-    if (video?.uri) {
-      await persistCapture(video.uri, 'video');
-    }
+    if (video?.uri) await persistCapture(video.uri, 'video');
   };
 
-  const handleCancel = () => {
+  const close = () => {
     if (isRecording) {
       discardNextRecording.current = true;
       cameraRef.current?.stopRecording();
-      return;
     }
     navigation.goBack();
   };
@@ -102,34 +108,50 @@ export function CaptureScreen({ route, navigation }: Props) {
       <CameraView ref={cameraRef} style={styles.camera} facing="back" mode={mode} />
 
       <View style={styles.overlay} pointerEvents="box-none">
-        <View style={styles.topRow}>
-          <Pressable style={styles.cancelButton} onPress={handleCancel} hitSlop={12}>
-            <Text style={styles.cancelButtonText}>{isRecording ? '■ Stop & Discard' : '✕ Cancel'}</Text>
+        <View style={styles.head}>
+          <Pressable style={styles.round} onPress={close} accessibilityLabel={isRecording ? 'Stop and discard' : 'Close camera'}>
+            <Icon name="close" size={20} color="#FFFFFF" />
           </Pressable>
-
-          <View style={styles.modeSwitch}>
-            <Pressable
-              style={[styles.modeOption, mode === 'picture' && styles.modeOptionActive]}
-              onPress={() => !isRecording && setMode('picture')}
-            >
-              <Text style={[styles.modeOptionText, mode === 'picture' && styles.modeOptionTextActive]}>Photo</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.modeOption, mode === 'video' && styles.modeOptionActive]}
-              onPress={() => !isRecording && setMode('video')}
-            >
-              <Text style={[styles.modeOptionText, mode === 'video' && styles.modeOptionTextActive]}>Video</Text>
-            </Pressable>
+          <View style={styles.headInfo}>
+            <Text style={styles.headTitle}>{ceNumber}</Text>
+            <Text style={styles.headSub}>Saves to {STAGES[stage].label}{stage === 3 ? ` · ${side === 'before' ? 'Before' : 'After'}` : ''}</Text>
           </View>
+          <View style={styles.counter}><Text style={styles.counterText}>{count}</Text></View>
         </View>
 
-        <View style={styles.shutterRow}>
-          <Pressable
-            style={[styles.shutter, isRecording && styles.shutterRecording]}
-            onPress={handleShutterPress}
-            disabled={isSaving}
-          >
-            <View style={[styles.shutterInner, isRecording && styles.shutterInnerRecording]} />
+        <View style={styles.tray}>
+          <View style={styles.pills}>
+            {STAGES.map((s) => (
+              <Pressable key={s.key} style={[styles.pill, stage === s.key && styles.pillOn]} onPress={() => !isRecording && setStage(s.key)}>
+                <Text style={[styles.pillText, stage === s.key && styles.pillTextOn]}>{s.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {stage === 3 && (
+            <View style={styles.pills}>
+              {(['before', 'after'] as PhotoSide[]).map((s) => (
+                <Pressable key={s} style={[styles.sidePill, side === s && styles.sidePillOn]} onPress={() => setSide(s)}>
+                  <Text style={[styles.pillText, side === s && styles.sideTextOn]}>{s === 'before' ? 'Before' : 'After'}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.shutterRow}>
+            <View style={styles.side3}>
+              {lastUri ? <Image source={{ uri: lastUri }} style={styles.last} /> : <View style={[styles.last, styles.lastEmpty]} />}
+            </View>
+            <Pressable style={[styles.shutter, isRecording && styles.shutterRecording]} onPress={handleShutterPress} disabled={isSaving} accessibilityLabel={mode === 'picture' ? 'Take photo' : isRecording ? 'Stop recording' : 'Start recording'}>
+              <View style={[styles.shutterInner, isRecording && styles.shutterInnerRecording]} />
+            </Pressable>
+            <View style={[styles.side3, styles.modes]}>
+              <Pressable onPress={() => !isRecording && setMode('picture')}><Text style={[styles.mode, mode === 'picture' && styles.modeOn]}>Photo</Text></Pressable>
+              <Pressable onPress={() => !isRecording && setMode('video')}><Text style={[styles.mode, mode === 'video' && styles.modeOn]}>Video</Text></Pressable>
+            </View>
+          </View>
+
+          <Pressable style={styles.done} onPress={close}>
+            <Text style={styles.doneText}>{count === 0 ? 'Done' : `Done · ${count} saved`}</Text>
           </Pressable>
         </View>
       </View>
@@ -138,106 +160,40 @@ export function CaptureScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  camera: {
-    flex: 1,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    justifyContent: 'space-between',
-    paddingVertical: 24,
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  cancelButton: {
-    position: 'absolute',
-    left: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-  },
-  cancelButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  modeSwitch: {
-    alignSelf: 'center',
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 999,
-    padding: 4,
-    gap: 4,
-  },
-  modeOption: {
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 999,
-  },
-  modeOptionActive: {
-    backgroundColor: '#fff',
-  },
-  modeOptionText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  modeOptionTextActive: {
-    color: '#000',
-  },
-  shutterRow: {
-    alignItems: 'center',
-  },
-  shutter: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 4,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shutterRecording: {
-    borderColor: '#E5484D',
-  },
-  shutterInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#fff',
-  },
-  shutterInnerRecording: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: '#E5484D',
-  },
-  permissionPrompt: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    gap: 16,
-  },
-  permissionText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontSize: 15,
-  },
-  permissionButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-  },
-  permissionButtonText: {
-    color: '#000',
-    fontWeight: '600',
-  },
+  container: { flex: 1, backgroundColor: '#000' },
+  camera: { flex: 1 },
+  overlay: { ...StyleSheet.absoluteFill, justifyContent: 'space-between' },
+  head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  round: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(15,20,28,0.6)', alignItems: 'center', justifyContent: 'center' },
+  headInfo: { flex: 1, backgroundColor: 'rgba(15,20,28,0.6)', borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 6 },
+  headTitle: { fontFamily: fonts.family, fontSize: 14, fontWeight: '500', color: '#FFFFFF' },
+  headSub: { fontFamily: fonts.family, fontSize: 12, color: colors.textSecondary },
+  counter: { minWidth: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(15,20,28,0.6)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  counterText: { fontFamily: fonts.family, fontSize: 16, fontWeight: '500', color: '#FFFFFF' },
+  tray: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg, backgroundColor: 'rgba(11,15,21,0.55)' },
+  pills: { flexDirection: 'row', justifyContent: 'center', gap: 6, flexWrap: 'wrap' },
+  pill: { height: 34, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: 'rgba(23,32,48,0.85)', justifyContent: 'center' },
+  pillOn: { backgroundColor: colors.accent },
+  pillText: { fontFamily: fonts.family, fontSize: 13, color: colors.textSecondary },
+  pillTextOn: { color: colors.accentInk, fontWeight: '500' },
+  sidePill: { height: 30, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: 'rgba(23,32,48,0.85)', justifyContent: 'center' },
+  sidePillOn: { backgroundColor: colors.selected, borderWidth: 1, borderColor: colors.accent },
+  sideTextOn: { color: colors.selectedText },
+  shutterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  side3: { flex: 1 },
+  last: { width: 48, height: 48, borderRadius: 12 },
+  lastEmpty: { backgroundColor: 'rgba(23,32,48,0.85)' },
+  modes: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md },
+  mode: { fontFamily: fonts.family, fontSize: 13, color: colors.textSecondary },
+  modeOn: { color: colors.accent, fontWeight: '500' },
+  shutter: { width: 78, height: 78, borderRadius: 39, borderWidth: 4, borderColor: 'rgba(255,255,255,0.35)', alignItems: 'center', justifyContent: 'center' },
+  shutterRecording: { borderColor: colors.danger },
+  shutterInner: { width: 62, height: 62, borderRadius: 31, backgroundColor: '#F3F5F8' },
+  shutterInnerRecording: { width: 28, height: 28, borderRadius: 6, backgroundColor: colors.danger },
+  done: { alignSelf: 'center', height: 44, paddingHorizontal: spacing.xl, borderRadius: radius.pill, backgroundColor: 'rgba(23,32,48,0.85)', justifyContent: 'center' },
+  doneText: { fontFamily: fonts.family, fontSize: 15, color: '#FFFFFF' },
+  permissionPrompt: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16 },
+  permissionText: { fontFamily: fonts.family, color: '#fff', textAlign: 'center', fontSize: 15 },
+  permissionButton: { backgroundColor: colors.accent, paddingVertical: 12, paddingHorizontal: 24, borderRadius: radius.pill },
+  permissionButtonText: { fontFamily: fonts.family, color: colors.accentInk, fontWeight: '600' },
 });
