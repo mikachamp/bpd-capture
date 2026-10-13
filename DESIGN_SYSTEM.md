@@ -235,6 +235,27 @@ desktop.
    failure, end the splash immediately and open the app. Keep the expo-gl WebGL fix in
    `utils/expoThreeRenderer.ts`.
 
+**Tools and tech — use the same stack unless there's a reason not to**
+
+| Job | Tool | Notes |
+|---|---|---|
+| 3D engine | **three.js**, mobile `three@^0.166.1`, desktop `three@^0.186.1` (`@types/three@^0.186`) | Plain three.js only; no React Three Fiber, no `expo-three` (its deps are stale). |
+| GL on Android | **`expo-gl`** (`~57.0.2`, SDK 57) `GLView` → WebGL2 context | Renderer made in `utils/expoThreeRenderer.ts` with a canvas shim; must hide `globalThis.WebGLRenderingContext` while constructing or three throws "WebGL 1 is not supported" and the app crashes. |
+| GL on desktop | Electron's Chromium WebGL2 | Same scene file; `LoadingScreen.tsx` hosts the canvas. |
+| Logo geometry | `THREE.Shape` from the logo's own bezier paths → `ExtrudeGeometry` (slight depth) | Paths stored as data in `bpdLogoMark.ts` (SVG units, y down). |
+| Exact gradients | `ShaderMaterial` with the SVG's linear-gradient stops, output as raw sRGB | Don't use lit materials for brand colours; lighting shifts them. A `uFill` uniform does the "pour" reveal. |
+| Line drawing | `CatmullRomCurve3` + `TubeGeometry`, revealed with `geometry.setDrawRange` | Used for the pencil's guide line. |
+| Glow | `PlaneGeometry` + `AdditiveBlending` halo | Cheaper and more reliable on phones than post-processing (no bloom passes). |
+| Camera | `PerspectiveCamera` FOV 45, distance fitted to the tighter screen axis | Small rotation that settles face-on gives the 3D feel. |
+| Extracting the logo | Python + **PyMuPDF** (`scripts/logo-extract/extract_logo.py`) | Reads paths and gradient functions from `BPT Logo.pdf`; final stops checked against `BPT Logo.svg`. |
+| Concept gallery | Single HTML page, three `0.169.0` from unpkg + `OrbitControls` | `BPD_Capture_Desktop/loading-screen-concepts/index.html`; also published as a clickable artifact. |
+| Video export | esbuild (bundle) → Electron (render frames) → ffmpeg (`libx264`, `yuv420p`) | `scripts/startup-video/README.md`. 1080×1920, 60 fps. |
+| Gallery save | `expo-asset` + `expo-media-library` (granular `photo`/`video` permission) | `services/brandVideo.ts`; copy to a readable file name first. |
+| Testing | Android emulator (`bpd_test` AVD, `-gpu host`) + `adb exec-out screencap` | Release APK only; web preview can't test expo-gl. |
+
+Don't add new animation libraries (Lottie, Reanimated scenes, GSAP, post-processing packages)
+without asking first. The stack above already covers what the brand animation needs.
+
 **How to check it**
 1. Render frames at fixed times and compare the final frame against the logo file.
 2. Test on the Android emulator with the **release** APK and take screenshots. Web preview
@@ -308,6 +329,7 @@ instead of a bottom tab bar, and a multi-column card grid. Same startup animatio
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-13 | 1.4.1 | Brand animation protocol: added the tools/tech table (three.js versions, expo-gl, geometry/shader techniques, PyMuPDF logo extraction, video pipeline, testing). |
 | 2026-10-13 | 1.4.1 | Added the Brand animation protocol (§7): rules and process for any future logo/splash animation, from the owner's feedback. |
 | 2026-10-13 | 1.4.1 | Startup animation exported as `assets/bpd-startup-animation.mp4` (1080×1920, 60fps, 4.5s, rendered from the same scene code); saved to the gallery once on first launch. Update dialog: "Update Now", no backup share sheet. |
 | 2026-10-13 | 1.4.0 | Startup animation replaced with "Pencil draws the logo" using the real Blueprint Digital logo mark; wordmark text removed. Same on desktop. |
