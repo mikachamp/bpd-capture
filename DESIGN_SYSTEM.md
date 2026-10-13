@@ -308,6 +308,7 @@ instead of a bottom tab bar, and a multi-column card grid. Same startup animatio
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-13 | 1.4.1 | Added the Brand animation protocol (§7): rules and process for any future logo/splash animation, from the owner's feedback. |
 | 2026-10-13 | 1.4.1 | Startup animation exported as `assets/bpd-startup-animation.mp4` (1080×1920, 60fps, 4.5s, rendered from the same scene code); saved to the gallery once on first launch. Update dialog: "Update Now", no backup share sheet. |
 | 2026-10-13 | 1.4.0 | Startup animation replaced with "Pencil draws the logo" using the real Blueprint Digital logo mark; wordmark text removed. Same on desktop. |
 | 2026-10-12 | 1.3.2 | Document created from the current code. |
