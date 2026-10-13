@@ -11,3 +11,6 @@ export const SYNC_INTERVAL_MS = 2 * 60 * 1000;
 
 /** Wait this long after a local change before pushing, so a burst of edits becomes one commit. */
 export const PUSH_DEBOUNCE_MS = 5000;
+
+/** The desktop is usually open all day on mains power, so it checks a little more often. */
+export const SYNC_INTERVAL_DESKTOP_MS = 60 * 1000;

@@ -29,7 +29,14 @@ It fails on SQL built from strings, raw HTML/`eval`, and hard-coded secrets.
    built by hand, so every value typed by a person must be escaped.
 6. **No secrets in either app.** Anything shipped in an APK or installer can be extracted.
    Logins (e.g. the planned GitHub sync) are per device and stored in the OS's secure storage.
-7. **Zip restore rejects unsafe entries** (`..`, absolute paths, and on desktop symlinks) before
+7. **Sync logins stay on the device.** The GitHub sign-in uses the device flow (a code
+   approved in the browser; no client secret exists in either app). The token is kept in
+   Android's encrypted SecureStore on the phone and encrypted with Electron `safeStorage`
+   (Windows DPAPI) on the desktop, never in the database, logs or backups. The GitHub App
+   should only be installed on `mikachamp/bpd-capture` with Contents: read and write.
+8. **Synced data is private only if the repo is private.** Job data lives on the `data` branch
+   of `bpd-capture`; set the repo to private once every device runs a version with sign-in.
+9. **Zip restore rejects unsafe entries** (`..`, absolute paths, and on desktop symlinks) before
    extracting anything. Don't use `extract-zip` (unfixed symlink advisory).
 
 ## Review — 2026-10-13

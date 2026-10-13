@@ -4,6 +4,35 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
+## TL;DR — current state (2026-10-13 evening, phone <-> desktop sync, branch feature/sync)
+
+**What it is:** both apps sync jobs, clients, photos and videos through the `data` branch of
+`mikachamp/bpd-capture` (user chose the same repo; it must become private). One JSON file per
+record (`jobs/<uuid>.json`, `clients/<uuid>.json`, `media/<job>/<media>.json` + binary).
+
+- **Shared engine:** `src/sync/syncCore.ts` (copied to `BPD_Capture_Desktop/src/shared/sync/`, keep
+  identical with `paths.ts`, `changes.ts`, `config.ts`). Pull changed files since the last-known
+  tree, newest `updatedAt` wins per record, push one commit, fast-forward only (422 = retry).
+- **Schema v2** (`PRAGMA user_version = 2`): uuid/updatedAt/syncedAt on orders, media_items,
+  clients; `sync_tombstones`, `sync_remote_index`. Demo jobs get `demo-` uuids and never sync;
+  demo data now seeds once per install.
+- **Phone:** `src/sync/mobileStore.ts`, `syncService.ts` (token in expo-secure-store; sync on
+  open/foreground, every 2 min, 5 s after edits); videos compressed with react-native-compressor
+  (nitro modules) before upload. Settings > Sync. The update check uses the token so it keeps
+  working when the repo is private.
+- **Desktop:** `src/main/sync/desktopStore.ts` + `syncService.ts` (token via safeStorage; every
+  60 s, on focus, after edits; ffmpeg-static compresses videos; Windows notification for new jobs).
+  IPC `sync:*`, `window.api.sync`, Settings > Sync.
+- **Tests:** `npm run test:sync` (9 two-device scenarios against a fake GitHub). The migration was
+  checked against a simulated old database (node:sqlite).
+- **Blocked on the user:** GitHub App Client ID (paste into `GITHUB_APP_CLIENT_ID` in both
+  `config.ts` copies). The App must have Device Flow on, token expiry off, Contents read/write,
+  installed only on `bpd-capture`.
+- **Rollout order:** build 1.5.0, test sign-in + real sync on emulator + desktop, release, user
+  installs 1.5.0 and signs in, *then* make the repo private (earlier = phones on 1.4.x lose updates).
+- **Gotcha:** Bash heredocs collapsed `\\` in regexes; the CE cleaner lost its backslash on
+  master (fixed in 5fb0303). Write regex code with the Write/Edit tools and `\x5c`.
+
 ## TL;DR — current state (2026-10-13 later, security review + fixes, icons 1.4.2)
 
 1. **Security review** of both apps: full findings and rules in `SECURITY.md`. Fixed: CE-number

@@ -14,6 +14,10 @@ import {
 
 export const REPO = 'mikachamp/bpd-capture';
 
+/** GitHub's JSON responses (shape checked where used). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Json = any;
+
 // ---------- Records as stored on GitHub ----------
 
 export type JobRecord = {
@@ -121,18 +125,18 @@ export class GitHub {
     const response = await this.call(`/git/ref/heads/${DATA_BRANCH}`, etag ? { headers: { 'If-None-Match': etag } } : {}, [304, 404]);
     if (response.status === 304) return 'unchanged';
     if (response.status === 404) return null;
-    const body = await response.json();
+    const body: Json = await response.json();
     return { sha: body.object.sha, etag: response.headers.get('ETag') };
   }
 
   async commitTree(commitSha: string): Promise<string> {
-    const body = await (await this.call(`/git/commits/${commitSha}`)).json();
+    const body: Json = await (await this.call(`/git/commits/${commitSha}`)).json();
     return body.tree.sha;
   }
 
   /** Every file in a tree: path -> blob sha. */
   async listTree(treeSha: string): Promise<Map<string, string>> {
-    const body = await (await this.call(`/git/trees/${treeSha}?recursive=1`)).json();
+    const body: Json = await (await this.call(`/git/trees/${treeSha}?recursive=1`)).json();
     if (body.truncated) throw new Error('The data branch has too many files to list in one request.');
     const map = new Map<string, string>();
     for (const entry of body.tree as { path: string; type: string; sha: string }[]) {
@@ -142,23 +146,23 @@ export class GitHub {
   }
 
   async blobBase64(sha: string): Promise<string> {
-    const body = await (await this.call(`/git/blobs/${sha}`)).json();
+    const body: Json = await (await this.call(`/git/blobs/${sha}`)).json();
     return String(body.content).replace(/\n/g, '');
   }
 
   async createBlob(base64: string): Promise<string> {
-    const body = await (await this.call('/git/blobs', { method: 'POST', body: JSON.stringify({ content: base64, encoding: 'base64' }) })).json();
+    const body: Json = await (await this.call('/git/blobs', { method: 'POST', body: JSON.stringify({ content: base64, encoding: 'base64' }) })).json();
     return body.sha;
   }
 
   async createTree(baseTree: string | null, entries: { path: string; sha: string | null }[]): Promise<string> {
     const tree = entries.map((e) => ({ path: e.path, mode: '100644', type: 'blob', sha: e.sha }));
-    const body = await (await this.call('/git/trees', { method: 'POST', body: JSON.stringify(baseTree ? { base_tree: baseTree, tree } : { tree }) })).json();
+    const body: Json = await (await this.call('/git/trees', { method: 'POST', body: JSON.stringify(baseTree ? { base_tree: baseTree, tree } : { tree }) })).json();
     return body.sha;
   }
 
   async createCommit(message: string, treeSha: string, parents: string[]): Promise<string> {
-    const body = await (await this.call('/git/commits', { method: 'POST', body: JSON.stringify({ message, tree: treeSha, parents }) })).json();
+    const body: Json = await (await this.call('/git/commits', { method: 'POST', body: JSON.stringify({ message, tree: treeSha, parents }) })).json();
     return body.sha;
   }
 
@@ -377,7 +381,7 @@ export async function startDeviceFlow(clientId: string): Promise<DeviceCode> {
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ client_id: clientId }),
   });
-  const body = await response.json();
+  const body: Json = await response.json();
   if (!response.ok || !body.device_code) throw new Error(body.error_description || 'Could not start GitHub sign-in.');
   return { deviceCode: body.device_code, userCode: body.user_code, verificationUri: body.verification_uri, interval: body.interval ?? 5, expiresIn: body.expires_in ?? 900 };
 }
@@ -394,7 +398,7 @@ export async function waitForDeviceToken(clientId: string, code: DeviceCode, isC
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ client_id: clientId, device_code: code.deviceCode, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
     });
-    const body = await response.json();
+    const body: Json = await response.json();
     if (body.access_token) return body.access_token as string;
     if (body.error === 'authorization_pending') continue;
     if (body.error === 'slow_down') { interval += 5; continue; }
@@ -408,5 +412,6 @@ export async function waitForDeviceToken(clientId: string, code: DeviceCode, isC
 export async function githubLogin(token: string): Promise<string> {
   const response = await fetch('https://api.github.com/user', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' } });
   if (!response.ok) throw new GitHubError(response.status, 'That GitHub sign-in no longer works. Sign in again.');
-  return (await response.json()).login as string;
+  const user: Json = await response.json();
+  return user.login as string;
 }
