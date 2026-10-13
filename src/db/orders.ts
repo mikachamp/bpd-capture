@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { getDb } from './client';
 import type { Order, OrderStatus } from '../types/models';
-import { normalizeCeNumber } from '../utils/ceNumber';
+import { assertValidCeNumber, normalizeCeNumber } from '../utils/ceNumber';
 import { DuplicateCeNumberErrorWeb, webOrders } from './webMock';
 
 const isWeb = Platform.OS === 'web';
@@ -36,7 +36,7 @@ export type CreateOrderInput = {
 };
 
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
-  const ceNumber = normalizeCeNumber(input.ceNumber);
+  const ceNumber = assertValidCeNumber(input.ceNumber);
   const dueDate = input.dueDate ?? null;
   const clientName = input.clientName?.trim() || null;
   const projectName = input.projectName?.trim() || null;
@@ -76,7 +76,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
 }
 
 export async function updateOrderCeNumber(id: number, rawCeNumber: string): Promise<Order> {
-  const ceNumber = normalizeCeNumber(rawCeNumber);
+  const ceNumber = assertValidCeNumber(rawCeNumber);
 
   if (isWeb) {
     try {

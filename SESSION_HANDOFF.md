@@ -4,6 +4,25 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
+## TL;DR — current state (2026-10-13 later, security review + fixes, icons 1.4.2)
+
+1. **Security review** of both apps: full findings and rules in `SECURITY.md`. Fixed: CE-number
+   path traversal (both apps), desktop IPC path checks, desktop navigation lock + webcam scoping,
+   removed `extract-zip`. Added `npm run security:check` (`scripts/security-check.mjs`).
+2. **Still open — critical:** the release APK is signed with React Native's public debug key.
+   Fix = private release keystore, then a one-time backup → uninstall → install → restore on the
+   phone. Waiting for the user's go-ahead.
+3. **1.4.2** shipped the real logo as app icon / in-app logo (`scripts/app-icon/README.md`). The
+   adaptive icon mark must stay ~45%; 58% was clipped by the round mask on device.
+4. **GitHub account hidden again** (anonymous 404s, ticket sent). Updates fail until fixed.
+5. **Desktop app**: desktop shortcut on the user's Desktop (`BPD Capture.lnk` → electron.exe with
+   the project folder; run `npm run build` in the desktop project after changes). Still no git repo.
+6. **Pending decisions**: GitHub sync (one private repo + "Sign in with GitHub" device flow
+   recommended; need the GitHub App Client ID), and a creative redesign on a separate branch.
+7. Testing the desktop app: launch `electron.exe <project> --remote-debugging-port=9333` and drive
+   it with CDP (`Runtime.evaluate` / `Page.captureScreenshot`) — screen-capture APIs return black
+   for Chromium windows, and grabbing the screen can capture the user's other windows.
+
 ## TL;DR — current state (2026-10-13, logo splash + one-tap updates, v1.4.1)
 
 1. **v1.4.0 — new startup animation**: "Pencil draws the logo" using the real Blueprint Digital

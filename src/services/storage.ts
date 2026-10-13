@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import type { MediaType } from '../types/models';
+import { isSafeFolderName } from '../utils/ceNumber';
 
 const GALLERY_ALBUM_NAME = 'BPD Capture';
 const isWeb = Platform.OS === 'web';
@@ -11,6 +12,10 @@ function getOrdersBaseDirectory(): Directory {
 }
 
 function getOrderDirectory(ceNumber: string): Directory {
+  // Last line of defence: a stored CE number must already be a safe folder name.
+  if (!isSafeFolderName(ceNumber)) {
+    throw new Error(`Refusing to use "${ceNumber}" as a job folder name.`);
+  }
   return new Directory(getOrdersBaseDirectory(), ceNumber);
 }
 
