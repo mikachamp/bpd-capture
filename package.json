@@ -22,6 +22,7 @@
     "expo-media-library": "~57.0.4",
     "expo-print": "~57.0.1",
     "expo-screen-orientation": "~57.0.2",
+    "expo-secure-store": "~57.0.4",
     "expo-sharing": "~57.0.18",
     "expo-sqlite": "~57.0.2",
     "expo-status-bar": "~57.0.1",
@@ -29,7 +30,9 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-compressor": "^2.0.3",
     "react-native-gesture-handler": "~2.32.0",
+    "react-native-nitro-modules": "^0.37.1",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
@@ -48,7 +51,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "security:check": "node scripts/security-check.mjs"
+    "security:check": "node scripts/security-check.mjs",
+    "test:sync": "node scripts/sync-test/run.mjs"
   },
   "private": true
 }

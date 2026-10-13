@@ -45,3 +45,4 @@ yarn-error.*
 *.apk
 /scripts/startup-video/out
 /scripts/app-icon/out
+/scripts/sync-test/out

@@ -55,3 +55,38 @@ export const MIGRATIONS_SQL: string[] = [
   `ALTER TABLE orders ADD COLUMN clientName TEXT`,
   `ALTER TABLE orders ADD COLUMN projectName TEXT`,
 ];
+
+/**
+ * Schema version 2 — sync support. Gated by PRAGMA user_version (see
+ * db/client.ts) so each statement runs exactly once per install.
+ * - uuid: the record's id on every device (local integer ids differ per device).
+ * - updatedAt: newest edit wins when two devices change the same record.
+ * - syncedAt: the updatedAt value last pushed to / pulled from GitHub;
+ *   a row is "dirty" when syncedAt is null or older than updatedAt.
+ * - sync_tombstones: paths to delete on GitHub for records deleted here
+ *   (a trailing "/" or "." means every path starting with it).
+ * - sync_remote_index: GitHub's file list as of the last sync, to tell
+ *   "deleted on the other device" apart from "never synced".
+ */
+export const SCHEMA_VERSION = 2;
+
+export const SYNC_MIGRATION_SQL: string[] = [
+  `ALTER TABLE orders ADD COLUMN uuid TEXT`,
+  `ALTER TABLE orders ADD COLUMN syncedAt TEXT`,
+  `ALTER TABLE media_items ADD COLUMN uuid TEXT`,
+  `ALTER TABLE media_items ADD COLUMN updatedAt TEXT`,
+  `ALTER TABLE media_items ADD COLUMN syncedAt TEXT`,
+  `ALTER TABLE clients ADD COLUMN uuid TEXT`,
+  `ALTER TABLE clients ADD COLUMN updatedAt TEXT`,
+  `ALTER TABLE clients ADD COLUMN syncedAt TEXT`,
+  `UPDATE orders SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL`,
+  `UPDATE media_items SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL`,
+  `UPDATE media_items SET updatedAt = createdAt WHERE updatedAt IS NULL`,
+  `UPDATE clients SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL`,
+  `UPDATE clients SET updatedAt = createdAt WHERE updatedAt IS NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_uuid ON orders(uuid)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_media_uuid ON media_items(uuid)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_uuid ON clients(uuid)`,
+  `CREATE TABLE IF NOT EXISTS sync_tombstones (path TEXT PRIMARY KEY, deletedAt TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS sync_remote_index (path TEXT PRIMARY KEY, blobSha TEXT NOT NULL)`,
+];

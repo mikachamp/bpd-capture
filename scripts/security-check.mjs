@@ -8,9 +8,9 @@ const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '
 const TARGETS = [join(ROOT, 'src'), join(ROOT, 'App.tsx'), join(ROOT, '..', 'BPD_Capture_Desktop', 'src')].filter(existsSync);
 
 // Interpolations allowed inside SQL text: constant column lists, never user input.
-const SQL_INTERPOLATION_ALLOWLIST = new Set(['ORDER_COLUMNS']);
+const SQL_INTERPOLATION_ALLOWLIST = new Set(['ORDER_COLUMNS', 'SCHEMA_VERSION']);
 // Variables allowed as the whole SQL argument: fixed SQL from constants in db/schema.ts.
-const SQL_VARIABLE_ALLOWLIST = /^(SCHEMA_SQL|MIGRATIONS_SQL|migration)[^A-Za-z0-9_]/;
+const SQL_VARIABLE_ALLOWLIST = /^(SCHEMA_SQL|MIGRATIONS_SQL|SYNC_MIGRATION_SQL|migration|statement)[^A-Za-z0-9_]/;
 const SQL_CALL = /\b(runAsync|getAllAsync|getFirstAsync|getEachAsync|execAsync|prepareAsync|prepare|exec)\s*\(\s*/g;
 
 const RULES = [

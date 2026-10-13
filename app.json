@@ -12,7 +12,9 @@
     "android": {
       "package": "com.blueprintdigital.bpdcapture",
       "versionCode": 9,
-      "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"],
+      "permissions": [
+        "android.permission.REQUEST_INSTALL_PACKAGES"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -45,7 +47,9 @@
       ],
       "expo-sharing",
       "expo-mail-composer",
-      "react-native-zip-archive"
+      "react-native-zip-archive",
+      "expo-secure-store",
+      "react-native-compressor"
     ]
   }
 }

@@ -12,7 +12,7 @@ It fails on SQL built from strings, raw HTML/`eval`, and hard-coded secrets.
 ## Rules
 
 1. **SQL: values always go in as `?` parameters.** Never put typed text into SQL with `${…}` or
-   `+`. The only interpolation allowed is the constant `ORDER_COLUMNS`. This is what makes SQL
+   `+`. The only interpolations allowed are the constants `ORDER_COLUMNS` and `SCHEMA_VERSION`; whole-statement variables must come from the constant lists in `db/schema.ts`. This is what makes SQL
    injection impossible: whatever someone types is stored as data, never run as SQL.
 2. **CE numbers are folder names, so they go through `utils/ceNumber.ts`** (desktop:
    `src/shared/ceNumber.ts`, an identical copy). `assertValidCeNumber` on create/rename;

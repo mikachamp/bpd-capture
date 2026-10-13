@@ -2,6 +2,9 @@ import { Platform } from 'react-native';
 import { getDb } from './client';
 import { webClients } from './webMock';
 import type { Client } from '../types/models';
+import { addTombstones } from './tombstones';
+import { notifyLocalChange } from '../sync/changes';
+import { clientPath } from '../sync/paths';
 
 const isWeb = Platform.OS === 'web';
 
@@ -22,16 +25,22 @@ export async function addClient(rawName: string): Promise<Client> {
   if (isWeb) return webClients.add(name);
   const db = await getDb();
   const now = new Date().toISOString();
-  await db.runAsync(`INSERT OR IGNORE INTO clients (name, createdAt) VALUES (?, ?)`, name, now);
+  await db.runAsync(`INSERT OR IGNORE INTO clients (uuid, name, createdAt, updatedAt) VALUES (lower(hex(randomblob(16))), ?, ?, ?)`, name, now, now);
   const client = await db.getFirstAsync<Client>(`SELECT * FROM clients WHERE name = ?`, name);
   if (!client) {
     throw new Error('Failed to save client.');
   }
+  notifyLocalChange();
   return client;
 }
 
 export async function deleteClient(id: number): Promise<void> {
   if (isWeb) return webClients.remove(id);
   const db = await getDb();
-  await db.runAsync(`DELETE FROM clients WHERE id = ?`, id);
+  const row = await db.getFirstAsync<{ uuid: string | null }>(`SELECT uuid FROM clients WHERE id = ?`, id);
+  await db.withTransactionAsync(async () => {
+    if (row?.uuid) await addTombstones(db, row.uuid, [clientPath(row.uuid)]);
+    await db.runAsync(`DELETE FROM clients WHERE id = ?`, id);
+  });
+  notifyLocalChange();
 }

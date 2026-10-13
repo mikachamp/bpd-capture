@@ -1,5 +1,6 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
-import { MIGRATIONS_SQL, SCHEMA_SQL } from './schema';
+import { MIGRATIONS_SQL, SCHEMA_SQL, SCHEMA_VERSION, SYNC_MIGRATION_SQL } from './schema';
+import { markExistingDemoRows } from './demoData';
 
 let dbPromise: Promise<SQLiteDatabase> | null = null;
 
@@ -19,6 +20,17 @@ export async function initDatabase(): Promise<void> {
     } catch {
       // Column/table already present from a prior install — nothing to do.
     }
+  }
+
+  const version = await db.getFirstAsync<{ user_version: number }>(`PRAGMA user_version`);
+  if ((version?.user_version ?? 0) < SCHEMA_VERSION) {
+    await db.withTransactionAsync(async () => {
+      for (const statement of SYNC_MIGRATION_SQL) {
+        await db.execAsync(statement);
+      }
+      await markExistingDemoRows(db);
+    });
+    await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   }
 }
 

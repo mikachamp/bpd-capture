@@ -3,6 +3,9 @@ import { getDb } from './client';
 import type { Order, OrderStatus } from '../types/models';
 import { assertValidCeNumber, normalizeCeNumber } from '../utils/ceNumber';
 import { DuplicateCeNumberErrorWeb, webOrders } from './webMock';
+import { addTombstones } from './tombstones';
+import { notifyLocalChange } from '../sync/changes';
+import { jobMediaPrefix, jobPath } from '../sync/paths';
 
 const isWeb = Platform.OS === 'web';
 
@@ -60,7 +63,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const db = await getDb();
   const now = new Date().toISOString();
   const result = await db.runAsync(
-    `INSERT INTO orders (ceNumber, status, createdAt, updatedAt, completedAt, dueDate, clientName, projectName) VALUES (?, 'in_process', ?, ?, NULL, ?, ?, ?)`,
+    `INSERT INTO orders (uuid, ceNumber, status, createdAt, updatedAt, completedAt, dueDate, clientName, projectName) VALUES (lower(hex(randomblob(16))), ?, 'in_process', ?, ?, NULL, ?, ?, ?)`,
     ceNumber,
     now,
     now,
@@ -72,6 +75,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   if (!order) {
     throw new Error('Failed to create order.');
   }
+  notifyLocalChange();
   return order;
 }
 
@@ -97,6 +101,7 @@ export async function updateOrderCeNumber(id: number, rawCeNumber: string): Prom
   const db = await getDb();
   const now = new Date().toISOString();
   await db.runAsync(`UPDATE orders SET ceNumber = ?, updatedAt = ? WHERE id = ?`, ceNumber, now, id);
+  notifyLocalChange();
   const order = await getOrderById(id);
   if (!order) {
     throw new Error('Failed to update CE number.');
@@ -109,6 +114,7 @@ export async function updateOrderDueDate(id: number, dueDate: string | null): Pr
   const db = await getDb();
   const now = new Date().toISOString();
   await db.runAsync(`UPDATE orders SET dueDate = ?, updatedAt = ? WHERE id = ?`, dueDate, now, id);
+  notifyLocalChange();
 }
 
 export async function updateOrderNotes(id: number, notes: string | null): Promise<void> {
@@ -116,6 +122,7 @@ export async function updateOrderNotes(id: number, notes: string | null): Promis
   const db = await getDb();
   const now = new Date().toISOString();
   await db.runAsync(`UPDATE orders SET notes = ?, updatedAt = ? WHERE id = ?`, notes, now, id);
+  notifyLocalChange();
 }
 
 export async function updateOrderClientInfo(
@@ -133,6 +140,7 @@ export async function updateOrderClientInfo(
     now,
     id
   );
+  notifyLocalChange();
 }
 
 /** All orders (any status) that have a due date set, for the calendar screen. */
@@ -148,7 +156,12 @@ export async function listOrdersWithDueDate(): Promise<Order[]> {
 export async function deleteOrder(id: number): Promise<void> {
   if (isWeb) return webOrders.remove(id);
   const db = await getDb();
-  await db.runAsync(`DELETE FROM orders WHERE id = ?`, id);
+  const row = await db.getFirstAsync<{ uuid: string | null }>(`SELECT uuid FROM orders WHERE id = ?`, id);
+  await db.withTransactionAsync(async () => {
+    if (row?.uuid) await addTombstones(db, row.uuid, [jobPath(row.uuid), jobMediaPrefix(row.uuid)]);
+    await db.runAsync(`DELETE FROM orders WHERE id = ?`, id);
+  });
+  notifyLocalChange();
 }
 
 export async function getOrderById(id: number): Promise<Order | null> {
@@ -202,6 +215,7 @@ export async function updateOrderStatus(id: number, status: OrderStatus): Promis
     completedAt,
     id
   );
+  notifyLocalChange();
 }
 
 export async function searchByCe(rawPartial: string): Promise<Order[]> {

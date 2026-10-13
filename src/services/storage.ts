@@ -116,6 +116,21 @@ export async function deleteOrderDirectory(ceNumber: string): Promise<void> {
 }
 
 /**
+ * Writes a photo/video downloaded by sync into the job's folder. Keeps the
+ * original file name unless it's taken, then prefixes the record id.
+ */
+export function writeSyncedMediaFile(ceNumber: string, fileName: string, recordUuid: string, base64: string): string {
+  const dir = ensureOrderDirectoryExists(ceNumber);
+  // \x5c is a backslash: path separators, Windows-reserved and control characters become "_".
+  const safeName = fileName.replace(/[/\x5c:*?"<>|\u0000-\u001f]/g, '_') || `${recordUuid}.bin`;
+  let file = new File(dir, safeName);
+  if (file.exists) file = new File(dir, `${recordUuid}_${safeName}`);
+  file.create();
+  file.write(base64, { encoding: 'base64' });
+  return file.uri;
+}
+
+/**
  * Renaming a CE number moves its media folder to match — callers must also
  * update every media_items.filePath row for the order (see
  * db/mediaItems.ts's updateMediaFilePathsForOrder) since this only moves the
