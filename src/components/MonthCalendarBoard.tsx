@@ -128,7 +128,7 @@ export function MonthCalendarBoard({
               <Text style={styles.weekLabel}>{group.label}</Text>
               {group.orders.map((order) => (
                 <Pressable key={order.id} style={styles.jobRow} onPress={() => onPressOrder(order.id)}>
-                  <Text style={styles.jobRowCe} numberOfLines={1}>{order.ceNumber}</Text>
+                  <Text style={styles.jobRowCe} numberOfLines={1}>{order.projectName || order.ceNumber}</Text>
                   <RowMeta order={order} />
                 </Pressable>
               ))}

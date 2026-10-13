@@ -141,7 +141,7 @@ function WeekList({
             ) : (
               jobs.map((order) => (
                 <Pressable key={order.id} style={styles.jobRow} onPress={() => onPressOrder(order.id)}>
-                  <Text style={styles.jobRowCe}>{order.ceNumber}</Text>
+                  <Text style={styles.jobRowCe}>{order.projectName || order.ceNumber}</Text>
                   <View
                     style={[
                       styles.jobRowBadge,
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingBottom: 120, // clears the floating tab bar
   },
   noJobsText: {
     ...typography.body,

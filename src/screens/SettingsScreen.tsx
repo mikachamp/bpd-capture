@@ -347,6 +347,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 120, // clears the floating tab bar
   },
   content: {
     padding: spacing.xl,

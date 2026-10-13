@@ -16,49 +16,55 @@ Source of truth in code:
 
 ## 1. Design principles
 
-1. **Dark first.** Near-black background, lighter surfaces for cards, white text. There is no light theme.
-2. **One accent, one gradient.** Purple `accent` for interactive state; the cyan→purple
-   `gradientAccent` is reserved for the single most important action on a screen and for brand moments.
-3. **Status is color-coded consistently.** In Process = amber (`warning`), Completed = green
-   (`success`), Overdue = red (`danger`). The same three colors mean the same thing everywhere.
-4. **Project name first.** Jobs are identified to people by project name; the CE number is the
-   secondary, labeled identifier underneath. Never show an unlabeled CE number field.
-5. **Destructive actions are quiet but confirmed.** Delete is a small red text link reached by
-   scrolling, never a big filled button — and it always asks for confirmation first.
-6. **Reference screenshots are the spec.** When a new visual reference is shared, implement it
-   directly and treat it as superseding the previous direction.
+> **Redesign branch (`redesign`, test build "BPD Capture Next").** This file describes the
+> redesign. The released app on `master` still uses the purple design; see the Changelog.
+
+1. **Built around the order flow.** Every CE order moves **Sample → Production → Packed →
+   Installed**. Lists filter by stage, each order shows how far it has got, the camera opens on
+   the order's current stage, and photos are filed under the stage they were taken in.
+2. **Dark, tinted, calm.** Deep navy surfaces with soft blue-white text, never pure white on
+   black. Few elements per screen: lists over tiles, no dashboards of numbers.
+3. **One accent, used once.** Ember orange (`accent`) marks the single most likely next action on
+   a screen (Capture, Photo · Production). Selected tabs and chips use a tint (`selected`), not
+   the accent and not white.
+4. **Status colours keep their meaning.** Overdue = `danger`, finished stage = `success`,
+   current stage = `accent`.
+5. **Project name first.** Orders are known by client + product; the CE number is secondary.
+6. **Destructive actions are quiet but confirmed** (Delete sits in the ••• menu or behind a
+   long-press, always with a confirmation).
+7. **No emoji in the UI.** Icons are line icons from `components/Icon.tsx` (react-native-svg).
+8. **Reference screenshots set the style, not the layout** (palette, type, shapes); layouts are
+   designed for this business's tasks.
 
 ---
 
-## 2. Color tokens
+## 2. Color tokens — "Ink & ember"
 
 | Token | Hex | Used for |
 |---|---|---|
-| `background` | `#131316` | Screen background |
-| `surface` | `#1C1C21` | Cards, inputs, headers, tab bar |
-| `surfaceMuted` | `#26262C` | Secondary buttons, segmented-control track, image placeholders |
-| `border` | `#333238` | Hairline borders and dividers |
-| `textPrimary` | `#F5F5F7` | Main text, input text |
-| `textSecondary` | `#9C9BA3` | Supporting text, field labels |
-| `textMuted` | `#6E6D74` | Placeholders, section labels, inactive tab icons |
-| `textOnDark` | `#FFFFFF` | Text on accent/gradient/black fills |
-| `accent` | `#6C5CE7` | Active tab, active segment, FAB, links ("View more ›"), Save |
-| `accentPressed` | `#5443C4` | Pressed accent |
-| `accentTint` | `#221D3D` | Due-date chip fill, today highlight, Dashboard hero band |
-| `success` / `successTint` | `#3ECF8E` / `#123326` | Completed status |
-| `warning` / `warningTint` | `#E8B93C` / `#332A12` | In Process status, "due today" |
-| `danger` / `dangerTint` | `#F2545B` / `#331518` | Overdue, delete, errors |
-| `dark` | `#000000` | Capture button, camera screen, startup animation background |
+| `background` | `#0F141C` | Screen background |
+| `backgroundTop` | `#141C27` | Top of the background tint (reserved for a soft top glow) |
+| `surface` | `#172030` | Cards, chips, round icon buttons, tab bar, inputs |
+| `surfaceMuted` | `#1E2939` | Empty stage-bar segments, inactive step dots |
+| `border` | `#22304A` | Hairline dividers between list rows |
+| `textPrimary` | `#DAE2EE` | Main text (soft blue-white, never #FFF) |
+| `textSecondary` | `#B3BFD0` | Client names, notes, supporting text |
+| `textMuted` | `#7F8EA5` | Meta lines, CE numbers, placeholders, inactive icons |
+| `textOnDark` | `#E4ECF7` | Text on dark overlays (camera) |
+| `accent` | `#E98B60` | The one main action per screen; current stage |
+| `accentPressed` | `#D2774E` | Pressed accent |
+| `accentTint` | `#3A2618` | Ring around the current stage dot |
+| `accentInk` | `#2B1206` | Text/icons on an accent fill |
+| `selected` / `selectedText` | `#26344B` / `#E4ECF7` | Selected tab, chip, segment, secondary buttons |
+| `secondary` | `#7C9CC8` | Secondary data colour (sparingly) |
+| `success` / `successTint` | `#6FBF9A` / `#15302A` | Finished stages |
+| `warning` / `warningTint` | `#E9B45F` / `#33270F` | Due today |
+| `danger` / `dangerTint` | `#F2546B` / `#3A1820` | Overdue, delete, errors |
+| `dark` | `#000000` | Camera background, startup animation background |
 
-**Gradient** — `gradientAccent = ['#4FC3F7', '#7C4DFF']` (cyan → purple), drawn diagonally
-(start `{0,0}` → end `{1,1}`). Used on: Export Field Report button, the PDF report header,
-the desktop wordmark/primary buttons, and the startup animation's lighting.
-
-**Hero band** — the Dashboard header area is a vertical `LinearGradient` from `accentTint`
-down into `background`.
-
-**Avatar palette** (job cards without a photo, color picked deterministically from the client
-name): `#6C5CE7 #4FC3F7 #F59E0B #EF4444 #10B981 #EC4899 #8B5CF6`.
+**No gradients in the UI.** `gradientAccent` now holds the accent twice so older components
+that still draw a two-stop fill render flat ember. (The PDF report keeps its own header.)
+**No avatar colours:** orders without photos show a camera placeholder on `surface`.
 
 ---
 
@@ -78,23 +84,23 @@ don't stretch cards edge to edge.
 
 ---
 
-## 4. Typography
+## 4. Typography — Outfit
 
-System font throughout (Roboto on Android, Segoe UI on desktop).
+**Outfit** (SIL Open Font Licence, `assets/fonts/`), embedded at build time by the `expo-font`
+config plugin as one family with weights 300/400/500/600. Every text style sets
+`fontFamily: fonts.family` (`'Outfit'`); weights above 600 render as 600.
 
-| Style | Size / weight | Color | Used for |
-|---|---|---|---|
-| `display` | 26 / 800 | textPrimary | Screen titles ("BPD Capture", "Calendar"), Job Detail project name |
-| `title` | 19 / 700 | textPrimary | Card headings (project name), month label |
-| `subtitle` | 15 / 600 | textPrimary | List row CE numbers |
-| `body` | 15 / 400 | textPrimary | Paragraph text, empty states |
-| `caption` | 13 / 500 | textSecondary | Dates, meta lines, hints |
-| `label` | 12 / 700, UPPERCASE, +0.6 letter-spacing | textMuted | Section headers ("ACTIVE JOBS", "NOTES", "MEDIA (2)"), stat tile labels |
+| Style | Size / weight | Used for |
+|---|---|---|
+| Screen title | 32 / 400, −0.6 tracking | "Jobs", order name (29) |
+| `title` | 20 / 500 | Card headings |
+| List primary | 17 / 400 | Product name in job rows |
+| `body` | 15 / 400 | Notes, paragraphs |
+| `caption` | 13 / 400, textMuted | Meta lines, dates, CE numbers |
+| `label` | 12 / 500, +0.3 tracking | Section labels (sentence case, not uppercase) |
 
-Stat tile numbers are 28 / 800. Button text is 13–15 / 700.
-
-**Inputs must always set `color: textPrimary` and `placeholderTextColor: textMuted`** — the
-platform default text color is black and is invisible on dark inputs.
+Big numbers and titles are light (400), never heavy bold. Inputs set `color: textPrimary` and
+`placeholderTextColor: textMuted`.
 
 ---
 
@@ -195,6 +201,31 @@ colors change**, it does not pick them up automatically.
 
 Safe areas: every screen uses `SafeAreaView` from **`react-native-safe-area-context`** (the
 built-in one does nothing on Android, and content slid under the camera cutout).
+
+---
+
+### Redesign screens (branch `redesign`)
+
+- **Tab bar** — a floating pill (`surface`, radius pill, 64 high) with four icon tabs (Jobs,
+  Calendar, Insights, Settings; selected = `selected` circle) and an accent **Capture** pill that
+  opens "Which order?" then the camera on that order's stage.
+- **Jobs** (`JobsScreen.tsx`) — logo + round search / new-order buttons; "Jobs" title with
+  "N open orders · ● n overdue"; search appears only when the search icon is tapped; stage chips
+  (All, Sample, Production, Packed, Installed, Done) with counts; rows = 52px photo thumbnail
+  (or camera placeholder), client + due ("● 3 days late" in `danger`), product name, a 4-part
+  stage bar (done `success`, current `accent`, rest `surfaceMuted`), stage + CE number.
+  Overdue first. "Send today's digest" is a quiet link under the list.
+- **Order** (`OrderScreen.tsx`) — back / ••• (Edit details, Delete order); client · CE; product
+  name; due line; **stage stepper** (numbered dots, ✓ when done, tap a finished one to move back);
+  a "what happens next" card with one tint button (e.g. "Client approved", "Production done →
+  Packed", "Mark installed"); photos grouped under each stage (and by day when a stage spans
+  several days), future stages dimmed; **Client report** (sample photos / installation proof)
+  and **Internal record** (everything); sticky accent button "Photo · <stage>". Long-press a
+  photo to delete it.
+- **Capture** (`CaptureScreen.tsx`) — multi-shot: stays open, shot counter, last-shot
+  thumbnail, light haptic per shot; stage pills choose where shots are filed; on Installed a
+  Before / After switch (flips to After after a Before shot); "Done · N saved".
+- **Edit details** — the previous Job Detail screen, reached from the ••• menu.
 
 ---
 
@@ -337,6 +368,7 @@ instead of a bottom tab bar, and a multi-column card grid. Same startup animatio
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-14 | Next (redesign) | Redesign on branch `redesign`, test build **BPD Capture Next**: Ink & ember palette, Outfit font, no emoji, stage-based Jobs / Order / multi-shot Capture screens, floating pill tab bar. |
 | 2026-10-13 | 1.5.0 (in progress) | Settings gains a **Sync** section (both apps): Sign in with GitHub (shows the device code large, then status, Sync now, small Sign out link). Desktop shows a Windows notification for jobs added on the phone. |
 | 2026-10-13 | 1.4.2 | App icons and in-app logo replaced with the real Blueprint Digital mark (was a camera placeholder); adaptive icon background now black. Desktop header, window and shortcut icon too. |
 | 2026-10-13 | 1.4.1 | Brand animation protocol: added the tools/tech table (three.js versions, expo-gl, geometry/shader techniques, PyMuPDF logo extraction, video pipeline, testing). |

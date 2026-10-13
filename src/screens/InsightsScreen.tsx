@@ -104,7 +104,7 @@ export function InsightsScreen({ navigation }: Props) {
                   style={styles.jobRow}
                   onPress={() => navigation.navigate('Order', { orderId: order.id })}
                 >
-                  <Text style={styles.jobRowCe} numberOfLines={1}>{order.ceNumber}</Text>
+                  <Text style={styles.jobRowCe} numberOfLines={1}>{order.projectName || order.ceNumber}</Text>
                   <Text style={styles.jobRowDue}>Due {format(new Date(`${order.dueDate}T00:00:00`), 'MMM d')}</Text>
                 </Pressable>
               ))
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    paddingBottom: spacing.xxl,
+    paddingBottom: 120, // clears the floating tab bar
   },
   centered: {
     width: '100%',

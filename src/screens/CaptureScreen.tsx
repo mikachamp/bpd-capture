@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, useMicrophonePermissions, type CameraMode } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -32,6 +32,7 @@ export function CaptureScreen({ route, navigation }: Props) {
   const [count, setCount] = useState(0);
   const [lastUri, setLastUri] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
+  const insets = useSafeAreaInsets();
   const discardNextRecording = useRef(false);
 
   if (!cameraPermission || !microphonePermission) {
@@ -108,7 +109,7 @@ export function CaptureScreen({ route, navigation }: Props) {
       <CameraView ref={cameraRef} style={styles.camera} facing="back" mode={mode} />
 
       <View style={styles.overlay} pointerEvents="box-none">
-        <View style={styles.head}>
+        <View style={[styles.head, { paddingTop: insets.top + spacing.sm }]}>
           <Pressable style={styles.round} onPress={close} accessibilityLabel={isRecording ? 'Stop and discard' : 'Close camera'}>
             <Icon name="close" size={20} color="#FFFFFF" />
           </Pressable>
@@ -119,7 +120,7 @@ export function CaptureScreen({ route, navigation }: Props) {
           <View style={styles.counter}><Text style={styles.counterText}>{count}</Text></View>
         </View>
 
-        <View style={styles.tray}>
+        <View style={[styles.tray, { paddingBottom: insets.bottom + spacing.md }]}>
           <View style={styles.pills}>
             {STAGES.map((s) => (
               <Pressable key={s.key} style={[styles.pill, stage === s.key && styles.pillOn]} onPress={() => !isRecording && setStage(s.key)}>

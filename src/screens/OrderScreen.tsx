@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActionSheetIOS, Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActionSheetIOS, Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -235,10 +235,13 @@ export function OrderScreen({ route, navigation }: Props) {
 }
 
 function Thumbs({ items, onOpen, onLongPress, onAdd }: { items: MediaItem[]; onOpen: (m: MediaItem) => void; onLongPress: (m: MediaItem) => void; onAdd?: () => void }) {
+  const { width } = useWindowDimensions();
+  const size = Math.floor((Math.min(width, 720) - spacing.xl * 2 - 6 * (THUMBS_PER_ROW - 1)) / THUMBS_PER_ROW);
+  const cell = { width: size, height: size };
   return (
     <View style={styles.thumbs}>
       {items.map((m) => (
-        <Pressable key={m.id} style={styles.thumbCell} onPress={() => onOpen(m)} onLongPress={() => onLongPress(m)} accessibilityLabel={m.fileName}>
+        <Pressable key={m.id} style={[styles.thumbCell, cell]} onPress={() => onOpen(m)} onLongPress={() => onLongPress(m)} accessibilityLabel={m.fileName}>
           {m.type === 'photo' ? (
             <Image source={{ uri: m.filePath }} style={styles.thumbImg} />
           ) : (
@@ -248,7 +251,7 @@ function Thumbs({ items, onOpen, onLongPress, onAdd }: { items: MediaItem[]; onO
         </Pressable>
       ))}
       {onAdd && (
-        <Pressable style={[styles.thumbCell, styles.addCell]} onPress={onAdd} accessibilityLabel="Add photo">
+        <Pressable style={[styles.thumbCell, cell, styles.addCell]} onPress={onAdd} accessibilityLabel="Add photo">
           <Icon name="plus" size={20} color={colors.textMuted} />
         </Pressable>
       )}
@@ -288,7 +291,7 @@ const styles = StyleSheet.create({
   sectionMeta: { fontFamily: fonts.family, fontSize: 12.5, color: colors.textMuted },
   day: { fontFamily: fonts.family, fontSize: 12, color: colors.textMuted, marginTop: spacing.sm, marginBottom: 6 },
   thumbs: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  thumbCell: { width: `${100 / THUMBS_PER_ROW - 2}%`, aspectRatio: 1, borderRadius: 12, overflow: 'hidden' },
+  thumbCell: { borderRadius: 12, overflow: 'hidden' },
   thumbImg: { width: '100%', height: '100%', borderRadius: 12 },
   thumbVideo: { backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   addCell: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
