@@ -161,8 +161,16 @@ The due-date picker is a centered `surface` sheet, max 380px wide, `xl` radius.
 Square thumbnails, `lg` radius, a "⋯" menu button top-right of each (rename / delete), with the
 "Delete Job" text link as the grid's footer.
 
-### App logo — `components/AppLogo.tsx`
-Camera glyph in a dark rounded square; shown in the Dashboard header at 44px.
+### App logo and app icons — `components/AppLogo.tsx`
+The real Blueprint Digital mark (`assets/bpd-logo-mark.png`, transparent), with **no tile behind
+it**. Shown in the mobile Dashboard header at 44px and the desktop header at 32px.
+
+All icons come from the startup animation's final frame, so they match the splash exactly
+(`scripts/app-icon/README.md` has the steps):
+- **Android launcher:** the mark on black. The adaptive icon keeps the mark at ~45% (58% was clipped on device) so circle and
+  squircle masks never clip it; its background layer is black (`#000000`). The themed
+  (monochrome) icon is a white silhouette with the pencil bars cut out.
+- **Desktop:** `build/icon.ico`, used by the window and the desktop shortcut.
 
 ---
 
@@ -329,6 +337,7 @@ instead of a bottom tab bar, and a multi-column card grid. Same startup animatio
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-13 | 1.4.2 | App icons and in-app logo replaced with the real Blueprint Digital mark (was a camera placeholder); adaptive icon background now black. Desktop header, window and shortcut icon too. |
 | 2026-10-13 | 1.4.1 | Brand animation protocol: added the tools/tech table (three.js versions, expo-gl, geometry/shader techniques, PyMuPDF logo extraction, video pipeline, testing). |
 | 2026-10-13 | 1.4.1 | Added the Brand animation protocol (§7): rules and process for any future logo/splash animation, from the owner's feedback. |
 | 2026-10-13 | 1.4.1 | Startup animation exported as `assets/bpd-startup-animation.mp4` (1080×1920, 60fps, 4.5s, rendered from the same scene code); saved to the gallery once on first launch. Update dialog: "Update Now", no backup share sheet. |

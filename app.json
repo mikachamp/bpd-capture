@@ -2,7 +2,7 @@
   "expo": {
     "name": "BPD Capture",
     "slug": "bpd-capture",
-    "version": "1.4.1",
+    "version": "1.4.2",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,10 +11,10 @@
     },
     "android": {
       "package": "com.blueprintdigital.bpdcapture",
-      "versionCode": 8,
+      "versionCode": 9,
       "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
