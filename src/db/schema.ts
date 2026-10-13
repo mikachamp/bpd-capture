@@ -68,7 +68,7 @@ export const MIGRATIONS_SQL: string[] = [
  * - sync_remote_index: GitHub's file list as of the last sync, to tell
  *   "deleted on the other device" apart from "never synced".
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export const SYNC_MIGRATION_SQL: string[] = [
   `ALTER TABLE orders ADD COLUMN uuid TEXT`,
@@ -89,4 +89,18 @@ export const SYNC_MIGRATION_SQL: string[] = [
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_uuid ON clients(uuid)`,
   `CREATE TABLE IF NOT EXISTS sync_tombstones (path TEXT PRIMARY KEY, deletedAt TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS sync_remote_index (path TEXT PRIMARY KEY, blobSha TEXT NOT NULL)`,
+];
+
+/**
+ * Schema version 3 — order stages (2026-10 redesign). Every CE order moves
+ * Sample (0) -> Production (1) -> Packed (2) -> Installed (3); photos are filed
+ * under the stage they were taken in, and installation photos are marked
+ * before/after. Finished orders (status 'completed') start at Installed.
+ */
+export const STAGE_MIGRATION_SQL: string[] = [
+  `ALTER TABLE orders ADD COLUMN stage INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE media_items ADD COLUMN stage INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE media_items ADD COLUMN side TEXT`,
+  `UPDATE orders SET stage = 3 WHERE status = 'completed'`,
+  `UPDATE media_items SET stage = (SELECT stage FROM orders WHERE orders.id = media_items.orderId)`,
 ];

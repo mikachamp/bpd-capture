@@ -1,5 +1,9 @@
 export type OrderStatus = 'in_process' | 'completed';
 
+/** 0 Sample, 1 Production, 2 Packed, 3 Installed — see utils/stages.ts. */
+export type Stage = 0 | 1 | 2 | 3;
+export type PhotoSide = 'before' | 'after';
+
 export type Order = {
   id: number;
   ceNumber: string;
@@ -12,6 +16,8 @@ export type Order = {
   notes: string | null;
   clientName: string | null;
   projectName: string | null;
+  /** Where the order is in Sample → Production → Packed → Installed. */
+  stage: Stage;
   /** The order's first photo (by capture order), for list-row thumbnails. Not a stored column — computed by a subquery in every listing/search query in db/orders.ts. */
   coverImage?: string | null;
 };
@@ -31,4 +37,8 @@ export type MediaItem = {
   filePath: string;
   fileName: string;
   createdAt: string;
+  /** The stage the photo/video was taken in. */
+  stage: Stage;
+  /** Installation photos only: before or after fitting. */
+  side: PhotoSide | null;
 };

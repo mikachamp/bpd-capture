@@ -31,6 +31,8 @@ export type JobRecord = {
   notes: string | null;
   clientName: string | null;
   projectName: string | null;
+  /** 0 Sample, 1 Production, 2 Packed, 3 Installed. Absent in records from older app versions. */
+  stage?: number;
 };
 
 export type MediaRecord = {
@@ -41,6 +43,8 @@ export type MediaRecord = {
   extension: string;
   createdAt: string;
   updatedAt: string;
+  stage?: number;
+  side?: 'before' | 'after' | null;
 };
 
 export type ClientRecord = { uuid: string; name: string; createdAt: string; updatedAt: string };
@@ -100,7 +104,7 @@ export class GitHubError extends Error {
 }
 
 export class GitHub {
-  constructor(private token: string, private repo = REPO) {}
+  constructor(private token: string, private branch: string = DATA_BRANCH, private repo = REPO) {}
 
   private async call(path: string, init: RequestInit = {}, okStatuses: number[] = []): Promise<Response> {
     const response = await fetch(`https://api.github.com/repos/${this.repo}${path}`, {
@@ -122,7 +126,7 @@ export class GitHub {
 
   /** Head commit of the data branch; 'unchanged' when the ETag still matches; null when the branch doesn't exist yet. */
   async head(etag: string | null): Promise<{ sha: string; etag: string | null } | 'unchanged' | null> {
-    const response = await this.call(`/git/ref/heads/${DATA_BRANCH}`, etag ? { headers: { 'If-None-Match': etag } } : {}, [304, 404]);
+    const response = await this.call(`/git/ref/heads/${this.branch}`, etag ? { headers: { 'If-None-Match': etag } } : {}, [304, 404]);
     if (response.status === 304) return 'unchanged';
     if (response.status === 404) return null;
     const body: Json = await response.json();
@@ -168,11 +172,11 @@ export class GitHub {
 
   /** Fast-forward only: fails with 422 if someone else pushed first, so nothing is ever overwritten. */
   async moveBranch(commitSha: string): Promise<void> {
-    await this.call(`/git/refs/heads/${DATA_BRANCH}`, { method: 'PATCH', body: JSON.stringify({ sha: commitSha, force: false }) });
+    await this.call(`/git/refs/heads/${this.branch}`, { method: 'PATCH', body: JSON.stringify({ sha: commitSha, force: false }) });
   }
 
   async createBranch(commitSha: string): Promise<void> {
-    await this.call('/git/refs', { method: 'POST', body: JSON.stringify({ ref: `refs/heads/${DATA_BRANCH}`, sha: commitSha }) });
+    await this.call('/git/refs', { method: 'POST', body: JSON.stringify({ ref: `refs/heads/${this.branch}`, sha: commitSha }) });
   }
 }
 

@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { getDb } from './client';
-import type { MediaItem, MediaType } from '../types/models';
+import type { MediaItem, MediaType, PhotoSide, Stage } from '../types/models';
 import { webMedia } from './webMock';
 import { addTombstones } from './tombstones';
 import { notifyLocalChange } from '../sync/changes';
@@ -12,20 +12,24 @@ export async function addMediaItem(
   orderId: number,
   type: MediaType,
   filePath: string,
-  fileName: string
+  fileName: string,
+  stage: Stage = 0,
+  side: PhotoSide | null = null
 ): Promise<MediaItem> {
   if (isWeb) return webMedia.add(orderId, type, filePath, fileName);
 
   const db = await getDb();
   const now = new Date().toISOString();
   const result = await db.runAsync(
-    `INSERT INTO media_items (uuid, orderId, type, filePath, fileName, createdAt, updatedAt) VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO media_items (uuid, orderId, type, filePath, fileName, createdAt, updatedAt, stage, side) VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?)`,
     orderId,
     type,
     filePath,
     fileName,
     now,
-    now
+    now,
+    stage,
+    side
   );
   const item = await db.getFirstAsync<MediaItem>(
     `SELECT * FROM media_items WHERE id = ?`,

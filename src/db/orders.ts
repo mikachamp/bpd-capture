@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { getDb } from './client';
-import type { Order, OrderStatus } from '../types/models';
+import type { Order, OrderStatus, Stage } from '../types/models';
 import { assertValidCeNumber, normalizeCeNumber } from '../utils/ceNumber';
 import { DuplicateCeNumberErrorWeb, webOrders } from './webMock';
 import { addTombstones } from './tombstones';
@@ -238,4 +238,23 @@ export async function searchByClient(rawPartial: string): Promise<Order[]> {
     `SELECT ${ORDER_COLUMNS} FROM orders WHERE clientName LIKE ? ORDER BY createdAt DESC LIMIT 25`,
     `%${partial}%`
   );
+}
+
+/**
+ * Moves an order to another stage. Reaching the end of Installed marks the
+ * whole order completed; moving back from completed reopens it.
+ */
+export async function updateOrderStage(id: number, stage: Stage, completed = false): Promise<void> {
+  if (isWeb) return webOrders.updateStatus(id, completed ? 'completed' : 'in_process');
+  const db = await getDb();
+  const now = new Date().toISOString();
+  await db.runAsync(
+    `UPDATE orders SET stage = ?, status = ?, completedAt = ?, updatedAt = ? WHERE id = ?`,
+    stage,
+    completed ? 'completed' : 'in_process',
+    completed ? now : null,
+    now,
+    id
+  );
+  notifyLocalChange();
 }

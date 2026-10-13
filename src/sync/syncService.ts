@@ -1,8 +1,10 @@
 import { AppState, Platform, type AppStateStatus } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import * as Application from 'expo-application';
 import { getSetting, setSetting } from '../db/settings';
 import { onLocalChange } from './changes';
 import { GITHUB_APP_CLIENT_ID, PUSH_DEBOUNCE_MS, SYNC_INTERVAL_MS } from './config';
+import { DATA_BRANCH } from './paths';
 import { createMobileStore, skippedUploads } from './mobileStore';
 import { GitHub, GitHubError, githubLogin, startDeviceFlow, syncOnce, waitForDeviceToken, type DeviceCode } from './syncCore';
 
@@ -42,6 +44,9 @@ export function onSyncedData(listener: () => void): () => void {
   return () => dataListeners.delete(listener);
 }
 
+/** The "BPD Capture Next" test build syncs to its own branch so test jobs never mix with real ones. */
+const dataBranch = () => (Application.applicationId?.endsWith('.next') ? 'data-next' : DATA_BRANCH);
+
 const deviceName = () => `phone (${(Platform.constants as { Model?: string }).Model ?? Platform.OS})`;
 
 /** Runs one sync now; if one is already running, queues exactly one more after it. */
@@ -58,7 +63,7 @@ export function syncNow(): Promise<void> {
         if (!token) return;
         setStatus({ phase: 'syncing', message: null });
         skippedUploads.length = 0;
-        const result = await syncOnce(new GitHub(token), createMobileStore(), deviceName());
+        const result = await syncOnce(new GitHub(token, dataBranch()), createMobileStore(), deviceName());
         const now = new Date().toISOString();
         await setSetting(LAST_SYNC_KEY, now);
         const skipped = skippedUploads.length ? `Not synced (over 95 MB after compression): ${skippedUploads.join(', ')}` : null;
