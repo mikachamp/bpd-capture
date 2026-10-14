@@ -5,7 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { listInProcessOrders } from '../db/orders';
 import type { Order } from '../types/models';
-import { stageLabel } from '../utils/stages';
+import { currentStep, whereLabel } from '../utils/stages';
 import { Icon } from '../components/Icon';
 import { colors, fonts, radius, spacing } from '../theme/theme';
 
@@ -33,13 +33,13 @@ export function PickJobScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <Pressable
             style={styles.row}
-            onPress={() => navigation.replace('Capture', { orderId: item.id, ceNumber: item.ceNumber, stage: item.stage })}
+            onPress={() => navigation.replace('Capture', { orderId: item.id, ceNumber: item.ceNumber, stage: item.stage, step: currentStep(item) })}
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.client}>{item.clientName || 'No client'} · {item.ceNumber}</Text>
               <Text style={styles.project} numberOfLines={1}>{item.projectName || item.ceNumber}</Text>
             </View>
-            <Text style={styles.stage}>{stageLabel(item.stage)}</Text>
+            <Text style={styles.stage}>{whereLabel(item)}</Text>
           </Pressable>
         )}
       />

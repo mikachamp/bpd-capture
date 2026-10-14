@@ -11,7 +11,7 @@ import { listAllCompletedOrders, listInProcessOrders } from '../db/orders';
 import { onSyncedData } from '../sync/syncService';
 import { exportAndShareDailyDigest } from '../services/reportPdf';
 import type { Order } from '../types/models';
-import { STAGES, stageLabel } from '../utils/stages';
+import { STAGES, whereLabel } from '../utils/stages';
 import { AppLogo } from '../components/AppLogo';
 import { Icon } from '../components/Icon';
 import { colors, fonts, radius, spacing } from '../theme/theme';
@@ -40,7 +40,7 @@ function urgency(a: Order, b: Order): number {
 
 /**
  * Jobs (home). Built around Blueprint Digital's order flow: every CE order moves
- * Sample → Production → Packed → Installed, so the list filters by stage and
+ * Sample → Production → Dispatch → Installed, so the list filters by stage and
  * each row shows how far the order has got.
  */
 export function JobsScreen({ navigation }: Props) {
@@ -182,7 +182,7 @@ export function JobsScreen({ navigation }: Props) {
                   ))}
                 </View>
                 <View style={styles.meta}>
-                  <Text style={styles.stage}>{item.status === 'completed' ? 'Completed' : stageLabel(item.stage)}</Text>
+                  <Text style={styles.stage}>{whereLabel(item)}</Text>
                   <Text style={styles.ce}>{item.ceNumber}</Text>
                 </View>
               </View>

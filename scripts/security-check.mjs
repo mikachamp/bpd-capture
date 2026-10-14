@@ -10,7 +10,7 @@ const TARGETS = [join(ROOT, 'src'), join(ROOT, 'App.tsx'), join(ROOT, '..', 'BPD
 // Interpolations allowed inside SQL text: constant column lists, never user input.
 const SQL_INTERPOLATION_ALLOWLIST = new Set(['ORDER_COLUMNS', 'SCHEMA_VERSION']);
 // Variables allowed as the whole SQL argument: fixed SQL from constants in db/schema.ts.
-const SQL_VARIABLE_ALLOWLIST = /^(SCHEMA_SQL|MIGRATIONS_SQL|SYNC_MIGRATION_SQL|STAGE_MIGRATION_SQL|migration|statement)[^A-Za-z0-9_]/;
+const SQL_VARIABLE_ALLOWLIST = /^(SCHEMA_SQL|MIGRATIONS_SQL|SYNC_MIGRATION_SQL|STAGE_MIGRATION_SQL|STEPS_MIGRATION_SQL|migration|statement)[^A-Za-z0-9_]/;
 // Optional <TypeArgs> so calls like getAllAsync<Order>(...) are checked too.
 const SQL_CALL = /\b(runAsync|getAllAsync|getFirstAsync|getEachAsync|execAsync|prepareAsync|prepare|exec)\s*(?:<[^>()]*>)?\s*\(\s*/g;
 

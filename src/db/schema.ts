@@ -68,7 +68,7 @@ export const MIGRATIONS_SQL: string[] = [
  * - sync_remote_index: GitHub's file list as of the last sync, to tell
  *   "deleted on the other device" apart from "never synced".
  */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const SYNC_MIGRATION_SQL: string[] = [
   `ALTER TABLE orders ADD COLUMN uuid TEXT`,
@@ -93,7 +93,7 @@ export const SYNC_MIGRATION_SQL: string[] = [
 
 /**
  * Schema version 3 — order stages (2026-10 redesign). Every CE order moves
- * Sample (0) -> Production (1) -> Packed (2) -> Installed (3); photos are filed
+ * Sample (0) -> Production (1) -> Packed/Dispatch (2) -> Installed (3); photos are filed
  * under the stage they were taken in, and installation photos are marked
  * before/after. Finished orders (status 'completed') start at Installed.
  */
@@ -103,4 +103,16 @@ export const STAGE_MIGRATION_SQL: string[] = [
   `ALTER TABLE media_items ADD COLUMN side TEXT`,
   `UPDATE orders SET stage = 3 WHERE status = 'completed'`,
   `UPDATE media_items SET stage = (SELECT stage FROM orders WHERE orders.id = media_items.orderId)`,
+];
+
+/**
+ * Schema version 4 — production steps. Production is split into the steps an
+ * order needs (machining = cutting, fabricating, finishing); stage 2 is now
+ * shown as "Dispatch" (packed and sent). Photos taken in Production record
+ * which step they belong to.
+ */
+export const STEPS_MIGRATION_SQL: string[] = [
+  `ALTER TABLE orders ADD COLUMN productionSteps TEXT NOT NULL DEFAULT 'machining,fabricating,finishing'`,
+  `ALTER TABLE orders ADD COLUMN productionStep INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE media_items ADD COLUMN step TEXT`,
 ];

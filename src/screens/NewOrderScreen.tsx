@@ -8,6 +8,8 @@ import { addClient, listClients } from '../db/clients';
 import type { Client } from '../types/models';
 import { isValidCeNumber } from '../utils/ceNumber';
 import { DueDateChip } from '../components/DueDateChip';
+import { Icon } from '../components/Icon';
+import { PRODUCTION_STEPS, type ProductionStepKey } from '../utils/stages';
 import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'NewOrder'>;
@@ -17,6 +19,7 @@ export function NewOrderScreen({ navigation }: Props) {
   const [clientName, setClientName] = useState('');
   const [projectName, setProjectName] = useState('');
   const [dueDate, setDueDate] = useState<string | null>(null);
+  const [steps, setSteps] = useState<ProductionStepKey[]>(PRODUCTION_STEPS.map((p) => p.key));
   const [submitting, setSubmitting] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -41,7 +44,8 @@ export function NewOrderScreen({ navigation }: Props) {
 
     setSubmitting(true);
     try {
-      const order = await createOrder({ ceNumber, dueDate, clientName, projectName });
+      const productionSteps = PRODUCTION_STEPS.map((p) => p.key).filter((k) => steps.includes(k)).join(',');
+      const order = await createOrder({ ceNumber, dueDate, clientName, projectName, productionSteps });
       const trimmedClient = clientName.trim();
       if (trimmedClient) {
         // Fire-and-forget: new client names are saved for future autocomplete
@@ -142,6 +146,26 @@ export function NewOrderScreen({ navigation }: Props) {
             <Text style={[styles.label, styles.fieldSpacing]}>Due Date</Text>
             <DueDateChip dueDate={dueDate} onChange={setDueDate} size="full" />
 
+            <Text style={[styles.label, styles.fieldSpacing]}>Production steps</Text>
+            <Text style={styles.stepsHint}>Tick what this order needs. You can change it later from the order.</Text>
+            <View style={styles.stepsRow}>
+              {PRODUCTION_STEPS.map((p) => {
+                const on = steps.includes(p.key);
+                return (
+                  <Pressable
+                    key={p.key}
+                    style={[styles.stepChip, on && styles.stepChipOn]}
+                    onPress={() => setSteps((cur) => (on ? cur.filter((k) => k !== p.key) : [...cur, p.key]))}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on }}
+                  >
+                    {on && <Icon name="check" size={14} color={colors.selectedText} strokeWidth={2.2} />}
+                    <Text style={[styles.stepChipText, on && styles.stepChipTextOn]}>{p.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
             <Pressable
               style={[styles.button, submitting && styles.buttonDisabled]}
               onPress={handleCreate}
@@ -157,6 +181,12 @@ export function NewOrderScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  stepsHint: { fontFamily: fonts.family, fontSize: 12.5, color: colors.textMuted, marginTop: 2 },
+  stepsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  stepChip: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  stepChipOn: { backgroundColor: colors.selected, borderColor: colors.selected },
+  stepChipText: { fontFamily: fonts.family, fontSize: 14, color: colors.textSecondary },
+  stepChipTextOn: { color: colors.selectedText },
   container: {
     flex: 1,
     backgroundColor: colors.background,

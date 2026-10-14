@@ -41,7 +41,7 @@ export async function seedDemoDataIfEmpty(): Promise<void> {
     const dueDate = seed.dueDateOffsetDays == null ? null : daysFromNowDate(seed.dueDateOffsetDays);
 
     await db.runAsync(
-      `INSERT INTO orders (uuid, ceNumber, status, createdAt, updatedAt, completedAt, dueDate, notes, clientName, projectName, stage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO orders (uuid, ceNumber, status, createdAt, updatedAt, completedAt, dueDate, notes, clientName, projectName, stage, productionSteps, productionStep) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       DEMO_UUID_PREFIX + seed.ceNumber,
       seed.ceNumber,
       seed.status,
@@ -52,7 +52,9 @@ export async function seedDemoDataIfEmpty(): Promise<void> {
       seed.notes ?? null,
       seed.clientName ?? null,
       seed.projectName ?? null,
-      seed.stage ?? (seed.status === 'completed' ? 3 : 0)
+      seed.stage ?? (seed.status === 'completed' ? 3 : 0),
+      seed.productionSteps ?? 'machining,fabricating,finishing',
+      seed.productionStep ?? 0
     );
   }
 }

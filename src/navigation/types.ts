@@ -15,7 +15,8 @@ export type RootStackParamList = {
   PickJob: undefined;
   JobDetail: { orderId: number };
   /** stage: which stage new shots are filed under (defaults to Sample). */
-  Capture: { orderId: number; ceNumber: string; stage?: Stage };
+  /** step: production step new shots are filed under (only when stage is Production). */
+  Capture: { orderId: number; ceNumber: string; stage?: Stage; step?: string | null };
   BrowseByDate: undefined;
   SearchByCe: undefined;
   SearchByClient: undefined;

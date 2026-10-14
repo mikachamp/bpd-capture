@@ -36,6 +36,8 @@ export type CreateOrderInput = {
   dueDate?: string | null;
   clientName?: string | null;
   projectName?: string | null;
+  /** Comma-separated production steps; defaults to all three. */
+  productionSteps?: string;
 };
 
 export async function createOrder(input: CreateOrderInput): Promise<Order> {
@@ -63,13 +65,14 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   const db = await getDb();
   const now = new Date().toISOString();
   const result = await db.runAsync(
-    `INSERT INTO orders (uuid, ceNumber, status, createdAt, updatedAt, completedAt, dueDate, clientName, projectName) VALUES (lower(hex(randomblob(16))), ?, 'in_process', ?, ?, NULL, ?, ?, ?)`,
+    `INSERT INTO orders (uuid, ceNumber, status, createdAt, updatedAt, completedAt, dueDate, clientName, projectName, productionSteps) VALUES (lower(hex(randomblob(16))), ?, 'in_process', ?, ?, NULL, ?, ?, ?, ?)`,
     ceNumber,
     now,
     now,
     dueDate,
     clientName,
-    projectName
+    projectName,
+    input.productionSteps ?? 'machining,fabricating,finishing'
   );
   const order = await getOrderById(result.lastInsertRowId);
   if (!order) {
@@ -256,5 +259,21 @@ export async function updateOrderStage(id: number, stage: Stage, completed = fal
     now,
     id
   );
+  notifyLocalChange();
+}
+
+/** Moves an order to another production step (index into its own step list). */
+export async function updateOrderProductionStep(id: number, step: number): Promise<void> {
+  if (isWeb) return;
+  const db = await getDb();
+  await db.runAsync(`UPDATE orders SET productionStep = ?, updatedAt = ? WHERE id = ?`, step, new Date().toISOString(), id);
+  notifyLocalChange();
+}
+
+/** Changes which production steps an order needs (comma-separated keys), restarting at the first. */
+export async function updateOrderProductionSteps(id: number, steps: string): Promise<void> {
+  if (isWeb) return;
+  const db = await getDb();
+  await db.runAsync(`UPDATE orders SET productionSteps = ?, productionStep = 0, updatedAt = ? WHERE id = ?`, steps, new Date().toISOString(), id);
   notifyLocalChange();
 }

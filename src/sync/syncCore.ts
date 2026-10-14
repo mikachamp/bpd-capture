@@ -31,8 +31,10 @@ export type JobRecord = {
   notes: string | null;
   clientName: string | null;
   projectName: string | null;
-  /** 0 Sample, 1 Production, 2 Packed, 3 Installed. Absent in records from older app versions. */
+  /** 0 Sample, 1 Production, 2 Dispatch, 3 Installed. Absent in records from older app versions. */
   stage?: number;
+  productionSteps?: string;
+  productionStep?: number;
 };
 
 export type MediaRecord = {
@@ -45,6 +47,7 @@ export type MediaRecord = {
   updatedAt: string;
   stage?: number;
   side?: 'before' | 'after' | null;
+  step?: string | null;
 };
 
 export type ClientRecord = { uuid: string; name: string; createdAt: string; updatedAt: string };

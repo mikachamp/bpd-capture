@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, useMicrophonePermissions, type CameraMode } from 'expo-camera';
@@ -7,8 +7,9 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { saveCapturedMedia } from '../services/storage';
 import { addMediaItem } from '../db/mediaItems';
+import { getOrderById } from '../db/orders';
 import type { PhotoSide, Stage } from '../types/models';
-import { STAGES } from '../utils/stages';
+import { STAGES, stepLabel, stepsFor, type ProductionStepKey } from '../utils/stages';
 import { Icon } from '../components/Icon';
 import { colors, fonts, radius, spacing } from '../theme/theme';
 
@@ -18,7 +19,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Capture'>;
  * Multi-shot camera. Stays open between shots (a typical job is 10–15
  * photos), files every shot under the chosen stage, and on Installed pairs
  * Before / After shots for the installation proof. Each shot is saved the
- * moment it's taken, so closing never loses anything.
+ * moment it's taken, so closing never loses anything. In Production, shots
+ * are also filed under the step (machining / fabricating / finishing).
  */
 export function CaptureScreen({ route, navigation }: Props) {
   const { orderId, ceNumber } = route.params;
@@ -33,6 +35,18 @@ export function CaptureScreen({ route, navigation }: Props) {
   const [lastUri, setLastUri] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
   const insets = useSafeAreaInsets();
+  const [steps, setSteps] = useState<ProductionStepKey[]>([]);
+  const [step, setStep] = useState<string | null>(route.params.step ?? null);
+
+  // The order's own production steps (machining / fabricating / finishing as needed).
+  useEffect(() => {
+    getOrderById(orderId).then((order) => {
+      if (!order) return;
+      const list = stepsFor(order);
+      setSteps(list);
+      setStep((current) => current ?? list[Math.min(order.productionStep ?? 0, list.length - 1)] ?? null);
+    });
+  }, [orderId]);
   const discardNextRecording = useRef(false);
 
   if (!cameraPermission || !microphonePermission) {
@@ -62,7 +76,7 @@ export function CaptureScreen({ route, navigation }: Props) {
     setIsSaving(true);
     try {
       const saved = await saveCapturedMedia(ceNumber, uri, type);
-      await addMediaItem(orderId, type, saved.filePath, saved.fileName, stage, stage === 3 ? side : null);
+      await addMediaItem(orderId, type, saved.filePath, saved.fileName, stage, stage === 3 ? side : null, stage === 1 ? step : null);
       setCount((n) => n + 1);
       if (type === 'photo') setLastUri(saved.filePath);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -115,7 +129,7 @@ export function CaptureScreen({ route, navigation }: Props) {
           </Pressable>
           <View style={styles.headInfo}>
             <Text style={styles.headTitle}>{ceNumber}</Text>
-            <Text style={styles.headSub}>Saves to {STAGES[stage].label}{stage === 3 ? ` · ${side === 'before' ? 'Before' : 'After'}` : ''}</Text>
+            <Text style={styles.headSub}>Saves to {STAGES[stage].label}{stage === 3 ? ` · ${side === 'before' ? 'Before' : 'After'}` : ''}{stage === 1 && step ? ` · ${stepLabel(step)}` : ''}</Text>
           </View>
           <View style={styles.counter}><Text style={styles.counterText}>{count}</Text></View>
         </View>
@@ -128,6 +142,15 @@ export function CaptureScreen({ route, navigation }: Props) {
               </Pressable>
             ))}
           </View>
+          {stage === 1 && steps.length > 0 && (
+            <View style={styles.pills}>
+              {steps.map((k) => (
+                <Pressable key={k} style={[styles.sidePill, step === k && styles.sidePillOn]} onPress={() => !isRecording && setStep(k)}>
+                  <Text style={[styles.pillText, step === k && styles.sideTextOn]}>{stepLabel(k)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
           {stage === 3 && (
             <View style={styles.pills}>
               {(['before', 'after'] as PhotoSide[]).map((s) => (

@@ -19,8 +19,10 @@ Source of truth in code:
 > **Redesign branch (`redesign`, test build "BPD Capture Next").** This file describes the
 > redesign. The released app on `master` still uses the purple design; see the Changelog.
 
-1. **Built around the order flow.** Every CE order moves **Sample → Production → Packed →
-   Installed**. Lists filter by stage, each order shows how far it has got, the camera opens on
+1. **Built around the order flow.** Every CE order moves **Sample → Production → Dispatch →
+   Installed**, and Production is split into the manufacturing steps the order needs:
+   **Machining** (cutting: laser, CNC, 3D printing) → **Fabricating** (assembly) → **Finishing**
+   (paint, vinyl, final QC). Lists filter by stage, each order shows how far it has got, the camera opens on
    the order's current stage, and photos are filed under the stage they were taken in.
 2. **Dark, tinted, calm.** Deep navy surfaces with soft blue-white text, never pure white on
    black. Few elements per screen: lists over tiles, no dashboards of numbers.
@@ -211,20 +213,26 @@ built-in one does nothing on Android, and content slid under the camera cutout).
   opens "Which order?" then the camera on that order's stage.
 - **Jobs** (`JobsScreen.tsx`) — logo + round search / new-order buttons; "Jobs" title with
   "N open orders · ● n overdue"; search appears only when the search icon is tapped; stage chips
-  (All, Sample, Production, Packed, Installed, Done) with counts; rows = 52px photo thumbnail
+  (All, Sample, Production, Dispatch, Installed, Done) with counts; rows = 52px photo thumbnail
   (or camera placeholder), client + due ("● 3 days late" in `danger`), product name, a 4-part
-  stage bar (done `success`, current `accent`, rest `surfaceMuted`), stage + CE number.
-  Overdue first. "Send today's digest" is a quiet link under the list.
+  stage bar (done `success`, current `accent`, rest `surfaceMuted`), stage + CE number (in Production the label includes the step, e.g.
+  "Production · Fabricating"). Overdue first. "Send today's digest" is a quiet link under the list.
 - **Order** (`OrderScreen.tsx`) — back / ••• (Edit details, Delete order); client · CE; product
   name; due line; **stage stepper** (numbered dots, ✓ when done, tap a finished one to move back);
-  a "what happens next" card with one tint button (e.g. "Client approved", "Production done →
-  Packed", "Mark installed"); photos grouped under each stage (and by day when a stage spans
+  a "what happens next" card with one tint button (e.g. "Client approved", "Machining done →
+  Fabricating", "Finishing done → Dispatch", "Mark installed"); in Production the section shows
+  **step chips** (done = `successTint` + ✓, current = `accentTint` with an `accent` border; tap to
+  move between steps) and groups photos under each step; photos grouped under each stage (and by day when a stage spans
   several days), future stages dimmed; **Client report** (sample photos / installation proof)
   and **Internal record** (everything); sticky accent button "Photo · <stage>". Long-press a
   photo to delete it.
 - **Capture** (`CaptureScreen.tsx`) — multi-shot: stays open, shot counter, last-shot
-  thumbnail, light haptic per shot; stage pills choose where shots are filed; on Installed a
-  Before / After switch (flips to After after a Before shot); "Done · N saved".
+  thumbnail, light haptic per shot; stage pills choose where shots are filed; in Production a
+  second row of **step pills** (only the order's steps); on Installed a Before / After switch
+  (flips to After after a Before shot); "Done · N saved".
+- **New order** — adds **Production steps** checkbox chips (all three ticked by default). The
+  ••• menu on an order has **Production steps**, a bottom sheet with the same three checkboxes
+  (changing them restarts Production at the first step).
 - **Edit details** — the previous Job Detail screen, reached from the ••• menu.
 
 ---
@@ -368,6 +376,7 @@ instead of a bottom tab bar, and a multi-column card grid. Same startup animatio
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-14 | Next (redesign) | Production split into steps (Machining → Fabricating → Finishing, chosen per order); stage 2 renamed **Dispatch** (was Packed). Step chips on the Order screen, step pills in the camera, step checkboxes on New order and in a Production steps sheet. |
 | 2026-10-14 | Next (redesign) | Redesign on branch `redesign`, test build **BPD Capture Next**: Ink & ember palette, Outfit font, no emoji, stage-based Jobs / Order / multi-shot Capture screens, floating pill tab bar. |
 | 2026-10-13 | 1.5.0 (in progress) | Settings gains a **Sync** section (both apps): Sign in with GitHub (shows the device code large, then status, Sync now, small Sign out link). Desktop shows a Windows notification for jobs added on the phone. |
 | 2026-10-13 | 1.4.2 | App icons and in-app logo replaced with the real Blueprint Digital mark (was a camera placeholder); adaptive icon background now black. Desktop header, window and shortcut icon too. |

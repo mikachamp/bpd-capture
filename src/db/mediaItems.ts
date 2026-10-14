@@ -14,14 +14,15 @@ export async function addMediaItem(
   filePath: string,
   fileName: string,
   stage: Stage = 0,
-  side: PhotoSide | null = null
+  side: PhotoSide | null = null,
+  step: string | null = null
 ): Promise<MediaItem> {
   if (isWeb) return webMedia.add(orderId, type, filePath, fileName);
 
   const db = await getDb();
   const now = new Date().toISOString();
   const result = await db.runAsync(
-    `INSERT INTO media_items (uuid, orderId, type, filePath, fileName, createdAt, updatedAt, stage, side) VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO media_items (uuid, orderId, type, filePath, fileName, createdAt, updatedAt, stage, side, step) VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     orderId,
     type,
     filePath,
@@ -29,7 +30,8 @@ export async function addMediaItem(
     now,
     now,
     stage,
-    side
+    side,
+    step
   );
   const item = await db.getFirstAsync<MediaItem>(
     `SELECT * FROM media_items WHERE id = ?`,

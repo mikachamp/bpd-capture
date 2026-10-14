@@ -14,6 +14,7 @@
 > | "Package identity stays the same" | Separate package `…bpdcapture.next` | User asked for a separately named build |
 > | Warm-black palette `#0F0F12` / `#E8734A` | Navy "Ink & ember" `#0F141C` / `#E98B60` | The swatch the user actually picked |
 > | `useFonts` at runtime | Fonts embedded by the `expo-font` config plugin | Expo SDK 57 docs recommend build-time embedding |
+> | (not in spec) | Production split into Machining → Fabricating → Finishing (per order); Packed renamed Dispatch | User request, 2026-10-14 |
 >
 > **Adopted from this spec:** multi-shot camera with counter, last-shot thumbnail and haptics;
 > real photo thumbnails (no avatar colours); no "View more" link; search behind an icon; photos

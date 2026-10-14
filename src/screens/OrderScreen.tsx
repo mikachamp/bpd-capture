@@ -5,13 +5,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import type { RootStackParamList } from '../navigation/types';
-import { deleteOrder, getOrderById, updateOrderStage } from '../db/orders';
+import { deleteOrder, getOrderById, updateOrderProductionStep, updateOrderProductionSteps, updateOrderStage } from '../db/orders';
 import { deleteMediaItem, listMediaForOrder } from '../db/mediaItems';
 import { deleteMediaFile, deleteOrderDirectory } from '../services/storage';
 import { exportAndShareJobReport } from '../services/reportPdf';
 import { onSyncedData } from '../sync/syncService';
 import type { MediaItem, Order, Stage } from '../types/models';
-import { STAGES, nextStepLabel, stageLabel } from '../utils/stages';
+import { PRODUCTION_STEPS, STAGES, currentStep, nextStepLabel, stageLabel, stepLabel, stepsFor, type ProductionStepKey } from '../utils/stages';
 import { Icon } from '../components/Icon';
 import { MediaPreview } from '../components/MediaGrid';
 import { colors, fonts, radius, spacing } from '../theme/theme';
@@ -31,8 +31,8 @@ function byDay(items: MediaItem[]): { day: string; items: MediaItem[] }[] {
 }
 
 /**
- * One CE order. The stepper shows where it is in Sample → Production → Packed →
- * Installed, one card says what happens next, and photos sit under the stage
+ * One CE order. The stepper shows where it is in Sample → Production → Dispatch →
+ * Installed (Production split into the order's machining / fabricating / finishing steps), one card says what happens next, and photos sit under the stage
  * they were taken in. The main button opens the camera on the current stage.
  */
 export function OrderScreen({ route, navigation }: Props) {
@@ -41,6 +41,7 @@ export function OrderScreen({ route, navigation }: Props) {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [preview, setPreview] = useState<MediaItem | null>(null);
   const [exporting, setExporting] = useState<'client' | 'internal' | null>(null);
+  const [editingSteps, setEditingSteps] = useState<ProductionStepKey[] | null>(null);
 
   const reload = useCallback(async () => {
     const [fresh, items] = await Promise.all([getOrderById(orderId), listMediaForOrder(orderId)]);
@@ -65,10 +66,32 @@ export function OrderScreen({ route, navigation }: Props) {
     return { text: days === 0 ? 'Due today' : `Due ${format(parseISO(order.dueDate), 'EEE d MMM')}`, over: false };
   })();
 
+  const steps = stepsFor(order);
+  const step = currentStep(order);
+  const stepIndex = Math.min(order.productionStep ?? 0, Math.max(steps.length - 1, 0));
+
   const advance = async () => {
     if (completed) await updateOrderStage(order.id, 3, false);
-    else if (stage < 3) await updateOrderStage(order.id, (stage + 1) as Stage);
-    else await updateOrderStage(order.id, 3, true);
+    else if (stage === 1 && steps.length > 0 && stepIndex < steps.length - 1) await updateOrderProductionStep(order.id, stepIndex + 1);
+    else if (stage < 3) {
+      await updateOrderStage(order.id, (stage + 1) as Stage);
+      if (stage === 0) await updateOrderProductionStep(order.id, 0);
+    } else await updateOrderStage(order.id, 3, true);
+    await reload();
+  };
+
+  const goToStep = (index: number) => {
+    if (stage !== 1 || completed || index === stepIndex) return;
+    Alert.alert(`Move to ${stepLabel(steps[index])}?`, index < stepIndex ? 'Photos stay where they are.' : undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Move', onPress: async () => { await updateOrderProductionStep(order.id, index); await reload(); } },
+    ]);
+  };
+
+  const saveSteps = async () => {
+    if (!editingSteps) return;
+    await updateOrderProductionSteps(order.id, PRODUCTION_STEPS.map((p) => p.key).filter((k) => editingSteps.includes(k)).join(','));
+    setEditingSteps(null);
     await reload();
   };
 
@@ -80,7 +103,7 @@ export function OrderScreen({ route, navigation }: Props) {
     ]);
   };
 
-  const openCamera = () => navigation.navigate('Capture', { orderId: order.id, ceNumber: order.ceNumber, stage: completed ? 3 : stage });
+  const openCamera = () => navigation.navigate('Capture', { orderId: order.id, ceNumber: order.ceNumber, stage: completed ? 3 : stage, step });
 
   const exportReport = async (kind: 'client' | 'internal') => {
     // Client: what they need to see now (sample for approval, or the installation proof). Internal: everything.
@@ -115,17 +138,18 @@ export function OrderScreen({ route, navigation }: Props) {
     ]);
 
   const openMore = () => {
-    const options = ['Edit details', 'Delete order', 'Cancel'];
+    const options = ['Edit details', 'Production steps', 'Delete order', 'Cancel'];
     const handle = (i: number) => {
       if (i === 0) navigation.navigate('JobDetail', { orderId: order.id });
-      if (i === 1) confirmDelete();
+      if (i === 1) setEditingSteps(steps);
+      if (i === 2) confirmDelete();
     };
-    if (Platform.OS === 'ios') ActionSheetIOS.showActionSheetWithOptions({ options, destructiveButtonIndex: 1, cancelButtonIndex: 2 }, handle);
+    if (Platform.OS === 'ios') ActionSheetIOS.showActionSheetWithOptions({ options, destructiveButtonIndex: 2, cancelButtonIndex: 3 }, handle);
     else Alert.alert(order.projectName || order.ceNumber, undefined, [
       { text: 'Edit details', onPress: () => handle(0) },
-      { text: 'Delete order', style: 'destructive', onPress: () => handle(1) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+      { text: 'Production steps', onPress: () => handle(1) },
+      { text: 'Delete order', style: 'destructive', onPress: () => handle(2) },
+    ], { cancelable: true });
   };
 
   const removeMedia = (item: MediaItem) =>
@@ -166,10 +190,10 @@ export function OrderScreen({ route, navigation }: Props) {
         </View>
 
         <View style={styles.next}>
-          <Text style={styles.nextText}>{completed ? 'This order is complete.' : STAGES[stage].hint}</Text>
+          <Text style={styles.nextText}>{completed ? 'This order is complete.' : step ? `${stepLabel(step)}: ${PRODUCTION_STEPS.find((p) => p.key === step)?.hint}` : STAGES[stage].hint}</Text>
           <Pressable style={styles.nextBtn} onPress={advance}>
             <Icon name="check" size={16} color={colors.selectedText} strokeWidth={2} />
-            <Text style={styles.nextBtnText}>{nextStepLabel(stage, stageMedia(stage).length > 0, completed)}</Text>
+            <Text style={styles.nextBtnText}>{nextStepLabel(order, stageMedia(stage).length > 0)}</Text>
           </Pressable>
         </View>
 
@@ -181,6 +205,46 @@ export function OrderScreen({ route, navigation }: Props) {
             return (
               <View key={s.key} style={[styles.section, styles.future]}>
                 <View style={styles.sectionHead}><Text style={styles.sectionTitle}>{s.label}</Text><Text style={styles.sectionMeta}>Not started</Text></View>
+              </View>
+            );
+          }
+          if (s.key === 1 && steps.length > 0) {
+            const productionDone = completed || stage > 1;
+            return (
+              <View key={s.key} style={styles.section}>
+                <View style={styles.sectionHead}>
+                  <Text style={styles.sectionTitle}>{s.label}</Text>
+                  <Text style={styles.sectionMeta}>{productionDone ? 'Done · ' : ''}{items.length} file{items.length === 1 ? '' : 's'}</Text>
+                </View>
+                <View style={styles.subSteps}>
+                  {steps.map((k, i) => {
+                    const done = productionDone || (stage === 1 && i < stepIndex);
+                    const now = stage === 1 && !completed && i === stepIndex;
+                    return (
+                      <Pressable key={k} style={[styles.subStep, done && styles.subStepDone, now && styles.subStepNow]} onPress={() => goToStep(i)} accessibilityLabel={`${stepLabel(k)}${done ? ', done' : now ? ', current step' : ''}`}>
+                        {done && <Icon name="check" size={13} color={colors.success} strokeWidth={2.4} />}
+                        <Text style={[styles.subStepText, now && styles.subStepTextNow]}>{stepLabel(k)}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {steps.map((k, i) => {
+                  const stepItems = items.filter((m) => m.step === k);
+                  const isNow = stage === 1 && !completed && i === stepIndex;
+                  if (stepItems.length === 0 && !isNow) return null;
+                  return (
+                    <View key={k}>
+                      <Text style={styles.day}>{stepLabel(k)} · {stepItems.length}</Text>
+                      <Thumbs items={stepItems} onOpen={setPreview} onLongPress={removeMedia} onAdd={isNow ? openCamera : undefined} />
+                    </View>
+                  );
+                })}
+                {items.some((m) => !m.step || !steps.includes(m.step as ProductionStepKey)) && (
+                  <View>
+                    <Text style={styles.day}>Other production photos</Text>
+                    <Thumbs items={items.filter((m) => !m.step || !steps.includes(m.step as ProductionStepKey))} onOpen={setPreview} onLongPress={removeMedia} />
+                  </View>
+                )}
               </View>
             );
           }
@@ -217,15 +281,37 @@ export function OrderScreen({ route, navigation }: Props) {
         </View>
 
         {order.notes ? <Text style={styles.notes}>{order.notes}</Text> : null}
-        <Text style={styles.hint}>Press and hold a photo to delete it. Tap a finished stage to move back.</Text>
+        <Text style={styles.hint}>Press and hold a photo to delete it. Tap a finished stage or step to move back.</Text>
       </ScrollView>
 
       <View style={styles.bottom}>
         <Pressable style={styles.primary} onPress={openCamera}>
           <Icon name="camera" size={20} color={colors.accentInk} strokeWidth={1.9} />
-          <Text style={styles.primaryText}>Photo · {stageLabel(completed ? 3 : stage)}</Text>
+          <Text style={styles.primaryText}>Photo · {step ? stepLabel(step) : stageLabel(completed ? 3 : stage)}</Text>
         </Pressable>
       </View>
+
+      <Modal visible={editingSteps !== null} transparent animationType="fade" onRequestClose={() => setEditingSteps(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setEditingSteps(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <Text style={styles.sheetTitle}>Production steps</Text>
+            <Text style={styles.sheetSub}>Tick the steps this order needs. Changing them restarts Production at the first step.</Text>
+            {PRODUCTION_STEPS.map((p) => {
+              const on = editingSteps?.includes(p.key) ?? false;
+              return (
+                <Pressable key={p.key} style={styles.sheetRow} onPress={() => setEditingSteps((cur) => (cur ? (on ? cur.filter((k) => k !== p.key) : [...cur, p.key]) : cur))}>
+                  <View style={[styles.box, on && styles.boxOn]}>{on && <Icon name="check" size={14} color={colors.accentInk} strokeWidth={2.4} />}</View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sheetRowTitle}>{p.label}</Text>
+                    <Text style={styles.sheetRowSub}>{p.hint}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+            <Pressable style={styles.sheetSave} onPress={saveSteps}><Text style={styles.sheetSaveText}>Save steps</Text></Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={preview !== null} animationType="fade" onRequestClose={() => setPreview(null)}>
         {preview && <MediaPreview item={preview} onClose={() => setPreview(null)} />}
@@ -303,6 +389,23 @@ const styles = StyleSheet.create({
   reportSub: { fontFamily: fonts.family, fontSize: 12, color: colors.textMuted, lineHeight: 16 },
   notes: { fontFamily: fonts.family, fontSize: 15, lineHeight: 23, color: colors.textSecondary, marginTop: spacing.xl },
   hint: { fontFamily: fonts.family, fontSize: 12, color: colors.textMuted, marginTop: spacing.xl, textAlign: 'center' },
+  subSteps: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: spacing.xs },
+  subStep: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 32, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: colors.surface },
+  subStepDone: { backgroundColor: colors.successTint },
+  subStepNow: { backgroundColor: colors.accentTint, borderWidth: 1, borderColor: colors.accent },
+  subStepText: { fontFamily: fonts.family, fontSize: 13, color: colors.textSecondary },
+  subStepTextNow: { color: colors.textPrimary, fontWeight: '500' },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.xl, gap: spacing.md },
+  sheetTitle: { fontFamily: fonts.family, fontSize: 20, fontWeight: '500', color: colors.textPrimary },
+  sheetSub: { fontFamily: fonts.family, fontSize: 13, color: colors.textMuted, lineHeight: 19 },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  box: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  boxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  sheetRowTitle: { fontFamily: fonts.family, fontSize: 16, color: colors.textPrimary },
+  sheetRowSub: { fontFamily: fonts.family, fontSize: 12.5, color: colors.textMuted },
+  sheetSave: { height: 52, borderRadius: radius.pill, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
+  sheetSaveText: { fontFamily: fonts.family, fontSize: 16, fontWeight: '500', color: colors.accentInk },
   bottom: { position: 'absolute', left: spacing.xl, right: spacing.xl, bottom: spacing.xl },
   primary: { height: 56, borderRadius: radius.pill, backgroundColor: colors.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, ...{ elevation: 6 } },
   primaryText: { fontFamily: fonts.family, fontSize: 16, fontWeight: '500', color: colors.accentInk },

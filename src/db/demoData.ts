@@ -11,8 +11,11 @@ export type SeedOrder = {
   clientName?: string | null;
   projectName?: string | null;
   notes?: string | null;
-  /** 0 Sample, 1 Production, 2 Packed, 3 Installed. */
+  /** 0 Sample, 1 Production, 2 Dispatch, 3 Installed. */
   stage?: number;
+  /** Production steps this order needs (defaults to all three) and the one it is on. */
+  productionSteps?: string;
+  productionStep?: number;
 };
 
 export const LEGACY_SEED_ORDERS: SeedOrder[] = [
@@ -130,10 +133,10 @@ export async function markExistingDemoRows(db: SQLiteDatabase): Promise<void> {
  * numbers, dates and notes are made up.
  */
 export const SEED_ORDERS: SeedOrder[] = [
-  { ceNumber: 'CE-2026-0142', status: 'in_process', stage: 1, createdDaysAgo: 9, dueDateOffsetDays: 7, clientName: 'Asics', projectName: 'Superblast shoe plinth', notes: 'Printing 12 plinths in white PETG. QC each one before packing.' },
+  { ceNumber: 'CE-2026-0142', status: 'in_process', stage: 1, createdDaysAgo: 9, dueDateOffsetDays: 7, clientName: 'Asics', projectName: 'Superblast shoe plinth', productionStep: 1, notes: 'Printing 12 plinths in white PETG. QC each one before packing.' },
   { ceNumber: 'CE-2026-0139', status: 'in_process', stage: 3, createdDaysAgo: 18, dueDateOffsetDays: -1, clientName: 'Hyrox', projectName: 'Event lightbox, 1200 × 600', notes: 'Installer on site. Before and after photos of the lit box for the client.' },
   { ceNumber: 'CE-2026-0147', status: 'in_process', stage: 0, createdDaysAgo: 4, dueDateOffsetDays: 11, clientName: 'JD Sports', projectName: 'Spinning wheel bracket', notes: 'Sample sent for approval.' },
-  { ceNumber: 'CE-2026-0131', status: 'in_process', stage: 2, createdDaysAgo: 12, dueDateOffsetDays: 1, clientName: 'New Balance', projectName: 'Shoe tags, 500 units' },
+  { ceNumber: 'CE-2026-0131', status: 'in_process', stage: 2, createdDaysAgo: 12, dueDateOffsetDays: 1, clientName: 'New Balance', projectName: 'Shoe tags, 500 units', productionSteps: 'machining,finishing' },
   { ceNumber: 'CE-2026-0128', status: 'in_process', stage: 0, createdDaysAgo: 15, dueDateOffsetDays: -4, clientName: 'Ackermans', projectName: 'Key-slot sample', notes: 'Waiting for the client to approve the sample.' },
   { ceNumber: 'CE-2026-0150', status: 'in_process', stage: 0, createdDaysAgo: 2, dueDateOffsetDays: null, clientName: 'ULA Skincare', projectName: 'Counter display riser' },
   { ceNumber: 'CE-2026-0117', status: 'completed', stage: 3, createdDaysAgo: 30, completedDaysAgo: 6, dueDateOffsetDays: -7, clientName: 'Versus', projectName: 'Shoe plinth set' },

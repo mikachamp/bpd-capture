@@ -4,6 +4,28 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
+## TL;DR — current state (2026-10-14 late, production steps in BPD Capture Next)
+
+User request: track manufacturing inside Production. Confirmed with the user:
+- Flow is now **Sample → Production → Dispatch → Installed**; **Dispatch replaces Packed**
+  (stage index 2 is unchanged in the data, only the label).
+- Production steps: **Machining** (cutting), **Fabricating**, **Finishing**; **each order picks
+  the steps it needs** (all three by default).
+
+Implementation (branch `redesign`):
+- **Schema v4** (`STEPS_MIGRATION_SQL`): `orders.productionSteps` (comma list, default all three),
+  `orders.productionStep` (index into that list), `media_items.step`. Sync records carry
+  `productionSteps`, `productionStep` and media `step` (desktop copy of `syncCore.ts` updated).
+- `src/utils/stages.ts`: `PRODUCTION_STEPS`, `stepsFor`, `currentStep`, `whereLabel`,
+  `nextStepLabel(order, hasPhotos)`; `db/orders.ts`: `updateOrderProductionStep`,
+  `updateOrderProductionSteps`; `addMediaItem(..., stage, side, step)`.
+- UI: Order screen step chips + photos per step + "Production steps" sheet (••• menu); camera
+  step pills; Jobs/picker show "Production · Fabricating"; New order step checkboxes; demo
+  orders include step examples (Asics on Fabricating, New Balance tags skip Fabricating).
+- Checks: typecheck clean, `security:check` clean (99 files), `test:sync` 9/9. One gradle run
+  failed transiently and the rerun succeeded. Emulator test of this build was in progress when
+  the emulator had to be restarted (it had been started in an earlier session).
+
 ## TL;DR — current state (2026-10-14, redesign test build "BPD Capture Next")
 
 **Branch `redesign`** (built on `feature/sync`, pushed). Not released; `master` is still 1.4.2.
