@@ -15,7 +15,7 @@ export type ProductionStepKey = 'machining' | 'fabricating' | 'finishing';
 
 /** Manufacturing steps inside Production, in workshop order. Each order picks the ones it needs. */
 export const PRODUCTION_STEPS: { key: ProductionStepKey; label: string; hint: string }[] = [
-  { key: 'machining', label: 'Machining', hint: 'Cutting: laser, CNC or 3D printing the parts.' },
+  { key: 'machining', label: 'Machining', hint: 'Cutting the parts: laser, CNC or 3D printing.' },
   { key: 'fabricating', label: 'Fabricating', hint: 'Assembling and joining the parts.' },
   { key: 'finishing', label: 'Finishing', hint: 'Sanding, painting, vinyl and final QC.' },
 ];

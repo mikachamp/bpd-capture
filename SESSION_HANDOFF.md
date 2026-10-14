@@ -23,11 +23,15 @@ Implementation (branch `redesign`):
   step pills; Jobs/picker show "Production · Fabricating"; New order step checkboxes; demo
   orders include step examples (Asics on Fabricating, New Balance tags skip Fabricating).
 - Checks: typecheck clean, `security:check` clean (99 files), `test:sync` 9/9. One gradle run
-  failed transiently and the rerun succeeded. **Not yet tested on a device:** the emulator stopped
-  booting (2026-10-14 ~23:00): qemu starts but Android never loads, with `-gpu host` and with
-  `-gpu swiftshader_indirect`; WHPX reports usable, 5.9 GB RAM free; `llama-server` (4.3 GB) and a
-  WSL/Docker VM (`vmmem`) were running. Next things to try: close LM Studio and Docker/WSL
-  (`wsl --shutdown`), cold boot / wipe the AVD, or test the APK on the phone.
+  failed transiently and the rerun succeeded.
+- **Tested on the emulator** (2026-10-14): the v3 → v4 upgrade kept the existing test data
+  (Dispatch chip, "Production · Machining"); step chips; "Machining done → Fabricating"; camera
+  opened on "Production · Fabricating" and the shot was filed under Fabricating; New order step
+  checkboxes. Fixed after testing: doubled colon in the step hint, roofing placeholders on New
+  order (now Asics / Superblast shoe plinth), low-contrast "Open Order" text.
+- **Emulator gotcha:** it hung at boot with `-gpu host` and with `-gpu swiftshader_indirect`
+  while LM Studio (`llama-server`) and WSL were running; **`-gpu auto` booted in 52 s**. Also clear
+  `~/.android/avd/bpd_test.avd/*.lock` (they are directories, use `rm -rf`) after killing it.
 
 ## TL;DR — current state (2026-10-14, redesign test build "BPD Capture Next")
 

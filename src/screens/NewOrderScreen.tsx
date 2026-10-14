@@ -90,7 +90,7 @@ export function NewOrderScreen({ navigation }: Props) {
               value={ceNumber}
               onChangeText={setCeNumber}
               onFocus={() => setShowSuggestions(false)}
-              placeholder="e.g. CE-2024-0091"
+              placeholder="e.g. CE-2026-0142"
               autoCapitalize="characters"
               placeholderTextColor={colors.textMuted}
               autoCorrect={false}
@@ -107,7 +107,7 @@ export function NewOrderScreen({ navigation }: Props) {
                 setShowSuggestions(true);
               }}
               onFocus={() => setShowSuggestions(true)}
-              placeholder="e.g. Marcus Reyes"
+              placeholder="e.g. Asics"
               placeholderTextColor={colors.textMuted}
               autoCorrect={false}
               style={styles.input}
@@ -135,7 +135,7 @@ export function NewOrderScreen({ navigation }: Props) {
               value={projectName}
               onChangeText={setProjectName}
               onFocus={() => setShowSuggestions(false)}
-              placeholder="e.g. Roof replacement — 14 Ashford Ct"
+              placeholder="e.g. Superblast shoe plinth"
               placeholderTextColor={colors.textMuted}
               autoCorrect={false}
               style={styles.input}
@@ -253,8 +253,8 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: colors.textOnDark,
-    fontWeight: '700',
+    color: colors.accentInk,
+    fontWeight: '600',
     fontFamily: fonts.family,
     fontSize: 16,
   },

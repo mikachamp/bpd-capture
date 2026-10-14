@@ -190,7 +190,7 @@ export function OrderScreen({ route, navigation }: Props) {
         </View>
 
         <View style={styles.next}>
-          <Text style={styles.nextText}>{completed ? 'This order is complete.' : step ? `${stepLabel(step)}: ${PRODUCTION_STEPS.find((p) => p.key === step)?.hint}` : STAGES[stage].hint}</Text>
+          <Text style={styles.nextText}>{completed ? 'This order is complete.' : step ? `${stepLabel(step)} · ${PRODUCTION_STEPS.find((p) => p.key === step)?.hint}` : STAGES[stage].hint}</Text>
           <Pressable style={styles.nextBtn} onPress={advance}>
             <Icon name="check" size={16} color={colors.selectedText} strokeWidth={2} />
             <Text style={styles.nextBtnText}>{nextStepLabel(order, stageMedia(stage).length > 0)}</Text>
