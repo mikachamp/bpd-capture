@@ -23,8 +23,11 @@ Implementation (branch `redesign`):
   step pills; Jobs/picker show "Production · Fabricating"; New order step checkboxes; demo
   orders include step examples (Asics on Fabricating, New Balance tags skip Fabricating).
 - Checks: typecheck clean, `security:check` clean (99 files), `test:sync` 9/9. One gradle run
-  failed transiently and the rerun succeeded. Emulator test of this build was in progress when
-  the emulator had to be restarted (it had been started in an earlier session).
+  failed transiently and the rerun succeeded. **Not yet tested on a device:** the emulator stopped
+  booting (2026-10-14 ~23:00): qemu starts but Android never loads, with `-gpu host` and with
+  `-gpu swiftshader_indirect`; WHPX reports usable, 5.9 GB RAM free; `llama-server` (4.3 GB) and a
+  WSL/Docker VM (`vmmem`) were running. Next things to try: close LM Studio and Docker/WSL
+  (`wsl --shutdown`), cold boot / wipe the AVD, or test the APK on the phone.
 
 ## TL;DR — current state (2026-10-14, redesign test build "BPD Capture Next")
 
