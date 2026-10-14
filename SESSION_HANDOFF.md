@@ -4,6 +4,44 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
+## TL;DR — current state (2026-10-14, redesign test build "BPD Capture Next")
+
+**Branch `redesign`** (built on `feature/sync`, pushed). Not released; `master` is still 1.4.2.
+
+- **Separate test app:** `APP_VARIANT=next` (see `app.config.js`) builds **BPD Capture Next**,
+  package `com.blueprintdigital.bpdcapture.next`. It installs alongside the real app with its own
+  data, syncs to its own `data-next` branch, and its update button explains that test builds
+  come as separate APKs. Build: `APP_VARIANT=next npx expo prebuild --platform android
+  --no-install --clean` in `C:\dev\bpd`, then the usual gradle `assembleRelease`. The clean
+  prebuild takes about 15 min (new native modules); JS-only rebuilds about 1 min. **Always use
+  `--clean` when switching between the real and Next variants** (different package).
+  Output copied to `builds/bpd-capture-next.apk` (84 MB, too big to send through chat).
+- **Business context** (user-confirmed): Blueprint Digital makes retail display/POS pieces;
+  every CE order moves **Sample -> Production -> Packed -> Installed**; workshop, owner and store
+  installers all capture photos; reports go to the client and to the office.
+- **Look:** "Ink & ember" navy palette (`src/theme/theme.ts`), Outfit font embedded by the
+  `expo-font` plugin (`assets/fonts/`, OFL), line icons in `components/Icon.tsx`
+  (react-native-svg), no emoji. A one-off codemod added `fontFamily: fonts.family` to every text
+  style; React Native 0.86's `Text` is a plain function component, so there is no global default.
+- **Data:** schema v3 adds `orders.stage`, `media_items.stage`, `media_items.side`
+  (before/after); sync records carry them. Fresh installs seed display-production sample orders
+  (`SEED_ORDERS`); `LEGACY_SEED_ORDERS` is kept only to recognise old demo rows.
+- **Screens:** `JobsScreen` (stage chips, search behind an icon, thumbnails, stage bar, digest
+  link), `OrderScreen` (stepper, next-step card, photos by stage and day, client vs internal
+  report, stage-aware camera button), `PickJobScreen` (Capture from the tab bar),
+  multi-shot `CaptureScreen` (stage pills, before/after, counter, haptics), floating pill tab
+  bar in `RootNavigator`. The old Job Detail is now "Edit details" (••• menu).
+- **Tested on the emulator** with screenshots: Jobs, Order, Capture (2-shot session filed under
+  Installed with Before/After), Calendar, Insights, Settings. Fixed in testing: content hidden
+  behind the floating bar, CE numbers shown instead of product names, camera header under the
+  status bar, squashed add tile.
+- **Not done yet:** sync still needs the GitHub App Client ID; Edit details is the old screen
+  restyled; client report reuses the field-report PDF filtered to one stage; desktop app not
+  redesigned; DESIGN_SYSTEM.md on this branch describes the redesign.
+- **Other agent's spec:** `REDESIGN_SPEC.md` was written before the user chose the stage
+  workflow. Where they conflict, the user's later choices were followed; see the status note at
+  the top of that file.
+
 ## TL;DR — current state (2026-10-13 evening, phone <-> desktop sync, branch feature/sync)
 
 **What it is:** both apps sync jobs, clients, photos and videos through the `data` branch of

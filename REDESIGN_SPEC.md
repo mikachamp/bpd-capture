@@ -1,5 +1,26 @@
 # BPD Capture — Redesign Specification
 
+> ## Build status — 2026-10-14 (read this first)
+>
+> Built on branch `redesign` as the test app **BPD Capture Next** (installs alongside the real
+> app). After this spec was written, the user saw a stage-based mockup and said they liked it
+> "a lot better", and asked for the build "with another name". So the build follows the user's
+> later choices where they conflict with this spec:
+>
+> | This spec | Built instead | Why |
+> |---|---|---|
+> | Due-date groups + day scrubber + Photos/Details/Notes tabs | Stage workflow: Sample → Production → Packed → Installed (stage chips, stepper, photos per stage) | User's preference after seeing it; matches how Blueprint Digital orders actually move |
+> | "Data layer: no changes" | Schema v3: `stage` on orders and media, `side` (before/after) on media | Needed for the stage workflow |
+> | "Package identity stays the same" | Separate package `…bpdcapture.next` | User asked for a separately named build |
+> | Warm-black palette `#0F0F12` / `#E8734A` | Navy "Ink & ember" `#0F141C` / `#E98B60` | The swatch the user actually picked |
+> | `useFonts` at runtime | Fonts embedded by the `expo-font` config plugin | Expo SDK 57 docs recommend build-time embedding |
+>
+> **Adopted from this spec:** multi-shot camera with counter, last-shot thumbnail and haptics;
+> real photo thumbnails (no avatar colours); no "View more" link; search behind an icon; photos
+> grouped by day; Outfit throughout; ember accent. See `SESSION_HANDOFF.md` (2026-10-14) and
+> `DESIGN_SYSTEM.md` on the `redesign` branch for what exists now.
+
+
 > **Purpose:** This document is the complete build spec for the redesign branch.
 > Another agent should be able to implement every change described here without
 > needing to ask clarifying questions. Work on the `redesign` branch.
