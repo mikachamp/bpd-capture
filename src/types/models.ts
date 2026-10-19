@@ -48,3 +48,30 @@ export type MediaItem = {
   /** Production photos only: machining, fabricating or finishing. */
   step: string | null;
 };
+
+export type StageEvent = {
+  id: number;
+  orderId: number;
+  stage: Stage;
+  step: string | null;
+  action: string;
+  actor: string;
+  notes: string | null;
+  createdAt: string;
+};
+
+export type OrderItem = {
+  id: number;
+  orderId: number;
+  description: string;
+  size: string | null;
+  material: string | null;
+  process: string | null;
+  quantity: number;
+  completedQty: number;
+  step: string | null;
+  isCompleted: boolean;
+  wtNumber: string | null;
+  createdAt: string;
+};
+

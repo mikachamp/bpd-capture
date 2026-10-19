@@ -352,14 +352,46 @@ Light document (white page) for printing/emailing: full-width `gradientAccent` h
 
 ---
 
+### Stage history & sign-offs timeline
+- Vertical connected timeline showing chronological stage events (`stage_history` table).
+- Connected vertical line (`border`), colored stage dot (`sample` #D29922, `production` #E98B60, `dispatch` #58A6FF, `installed` #6FBF9A).
+- Each entry shows action title, timestamp, signed-by actor badge (`accent` tint), and optional quote note.
+- Advance action button opens a **Sign-off modal sheet**:
+  - Displays action title (e.g. "Machining done → Fabricating", "Client approved").
+  - Quick-select actor pills: workshop operators (`Thabo`, `Sizwe`, `Lerato`) or client name (`order.clientName`), plus custom name input.
+  - Notes textarea for approval details (e.g. "Approved via WhatsApp", "Inspected, all edges deburred").
+  - Confirm button logs the `stage_history` record and advances the stage/step.
+
+---
+
+### Work Ticket Checklist & Items
+- Interactive manufacturing checklist derived from physical **SO - Work Ticket** sheets (`order_items` table, Schema v6).
+- Renders item description, dimensions (`size`), substrate/material (`material`), and fabrication process (`process`).
+- Interactive square checkbox with green checkmark when complete; item description gains subtle strike-through.
+- Step badge indicates the fabrication stage (e.g., `Machining`, `Fabricating`, `Finishing`).
+- Batch quantity stepper (`−` / `+`) tracks discrete units completed (e.g., `25/50`) without leaving the order screen.
+
+---
+
 ## 9. Desktop app mapping
 
-The desktop app (`BPD_Capture_Desktop`) reuses the same tokens as CSS variables
-(`--color-background`, `--color-accent`, `--gradient-accent`, `--space-*`, `--radius-*`) and the
-same type styles as classes (`.display`, `.title`, `.subtitle`, `.caption`, `.label`). Buttons
-are `.btn-primary` (gradient) and `.btn-secondary` (surface + border); cards are `.card`.
-Layout differs for a wide window: top nav (Dashboard / Calendar / Insights / Clients) + Settings
-instead of a bottom tab bar, and a multi-column card grid. Same startup animation.
+The desktop app (`BPD_Capture_Desktop`, Electron + Vite + React) mirrors the mobile app's Ink & Ember design system and 4-stage workflow:
+- **Typography:** Local **Outfit** font family (weights 300, 400, 500, 600) loaded via `@font-face` in `theme.css`.
+- **Color tokens & CSS variables:** Exact Ink & Ember hex values (`--color-background` `#0F141C`, `--color-surface` `#172030`, `--color-accent` `#E98B60`, stage-specific badges).
+- **Navigation:** Top header bar with Blueprint Digital mark (32px), title, pill-style navigation tabs (Dashboard, Calendar, Insights, Clients), and Settings button.
+- **Dashboard:**
+  - Fast search with clear button.
+  - Stage filter chips: All Active, Sample, Production, Dispatch, Installed, Completed.
+  - Multi-column card grid with cover photo thumbnails (loaded on demand via IPC `storage:readAsDataUrl`), stage badges, where labels (`Production · Fabricating`), project names, CE numbers, and due dates.
+- **Job Detail:**
+  - 4-stage visual stepper (Sample → Production → Dispatch → Installed) with sub-step pills for Production (Machining, Fabricating, Finishing).
+  - Contextual "Move on" action card with hint.
+  - Sign-off dialog with quick actor pills and approval notes.
+  - Connected Stage History & Sign-Offs timeline displaying all historical records.
+  - **Work Ticket Checklist**: interactive checklist card showing completion progress bar, items list with checkboxes, item strikethrough, step & WT badges, material/size pills, `−`/`+` batch steppers, inline quick-add form, and delete actions.
+  - Job details form (project name, CE number, client, due date, manufacturing steps toggles, notes).
+  - Photos & media grid with capture and import capabilities.
+- **New Order Modal:** Dialog with CE number validation, project name, client autocomplete, due date, and production steps checkboxes.
 
 ---
 
@@ -376,6 +408,8 @@ instead of a bottom tab bar, and a multi-column card grid. Same startup animatio
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-19 | Next (redesign) | **Work Ticket Checklist & Schema v6 (Mobile & Desktop)**: `order_items` table and migrations for physical work ticket items, sizes, materials, processes, and quantities. Interactive checklist card in `OrderScreen.tsx` (mobile) and `JobDetail.tsx` (desktop) with completion strike-through, step badges, inline item creation, and `−`/`+` batch quantity steppers. Added offline ML synthetic dataset generator and training pipeline for Donut document understanding. |
+| 2026-10-17 | Next (redesign) | **Stage history and sign-offs** (both mobile and desktop): schema v5 `stage_history` table, sign-off sheet/modal with operator quick pills (`Thabo`, `Sizwe`, `Lerato`, client) and notes, connected timeline displaying chronological approvals. **Desktop app redesign**: Ink & Ember palette, Outfit font, 4-stage workflow stepper, stage filter chips, cards with cover thumbnails, and stage history timeline. |
 | 2026-10-14 | Next (redesign) | Production split into steps (Machining → Fabricating → Finishing, chosen per order); stage 2 renamed **Dispatch** (was Packed). Step chips on the Order screen, step pills in the camera, step checkboxes on New order and in a Production steps sheet. |
 | 2026-10-14 | Next (redesign) | Redesign on branch `redesign`, test build **BPD Capture Next**: Ink & ember palette, Outfit font, no emoji, stage-based Jobs / Order / multi-shot Capture screens, floating pill tab bar. |
 | 2026-10-13 | 1.5.0 (in progress) | Settings gains a **Sync** section (both apps): Sign in with GitHub (shows the device code large, then status, Sync now, small Sign out link). Desktop shows a Windows notification for jobs added on the phone. |

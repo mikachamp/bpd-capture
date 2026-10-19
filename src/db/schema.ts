@@ -35,7 +35,35 @@ CREATE TABLE IF NOT EXISTS clients (
   createdAt TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS stage_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  orderId INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  stage INTEGER NOT NULL,
+  step TEXT,
+  action TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  notes TEXT,
+  createdAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  orderId INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  size TEXT,
+  material TEXT,
+  process TEXT,
+  quantity INTEGER NOT NULL DEFAULT 1,
+  completedQty INTEGER NOT NULL DEFAULT 0,
+  step TEXT,
+  isCompleted INTEGER NOT NULL DEFAULT 0,
+  wtNumber TEXT,
+  createdAt TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_media_orderId ON media_items(orderId);
+CREATE INDEX IF NOT EXISTS idx_stage_history_orderId ON stage_history(orderId);
+CREATE INDEX IF NOT EXISTS idx_order_items_orderId ON order_items(orderId);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_completedAt ON orders(completedAt);
 CREATE INDEX IF NOT EXISTS idx_orders_dueDate ON orders(dueDate);
@@ -68,7 +96,7 @@ export const MIGRATIONS_SQL: string[] = [
  * - sync_remote_index: GitHub's file list as of the last sync, to tell
  *   "deleted on the other device" apart from "never synced".
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 6;
 
 export const SYNC_MIGRATION_SQL: string[] = [
   `ALTER TABLE orders ADD COLUMN uuid TEXT`,
@@ -116,3 +144,46 @@ export const STEPS_MIGRATION_SQL: string[] = [
   `ALTER TABLE orders ADD COLUMN productionStep INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE media_items ADD COLUMN step TEXT`,
 ];
+
+/**
+ * Schema version 5 — stage history and sign-offs. Records who advanced each
+ * stage/step and when, plus sign-off notes (e.g., client sample approvals,
+ * operator machining logs, installation proofs).
+ */
+export const STAGE_HISTORY_MIGRATION_SQL: string[] = [
+  `CREATE TABLE IF NOT EXISTS stage_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    orderId INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    stage INTEGER NOT NULL,
+    step TEXT,
+    action TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    notes TEXT,
+    createdAt TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_stage_history_orderId ON stage_history(orderId)`,
+];
+
+/**
+ * Schema version 6 — job ticket line items and checklist. Records the
+ * physical work ticket items, sizes, materials, processes, and quantities
+ * with completion checkboxes.
+ */
+export const ORDER_ITEMS_MIGRATION_SQL: string[] = [
+  `CREATE TABLE IF NOT EXISTS order_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    orderId INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    description TEXT NOT NULL,
+    size TEXT,
+    material TEXT,
+    process TEXT,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    completedQty INTEGER NOT NULL DEFAULT 0,
+    step TEXT,
+    isCompleted INTEGER NOT NULL DEFAULT 0,
+    wtNumber TEXT,
+    createdAt TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_order_items_orderId ON order_items(orderId)`,
+];
+

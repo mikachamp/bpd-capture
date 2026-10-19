@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { getDb } from './client';
-import type { Order, OrderStatus, Stage } from '../types/models';
+import type { Order, OrderItem, OrderStatus, Stage, StageEvent } from '../types/models';
 import { assertValidCeNumber, normalizeCeNumber } from '../utils/ceNumber';
 import { DuplicateCeNumberErrorWeb, webOrders } from './webMock';
 import { addTombstones } from './tombstones';
@@ -248,7 +248,7 @@ export async function searchByClient(rawPartial: string): Promise<Order[]> {
  * whole order completed; moving back from completed reopens it.
  */
 export async function updateOrderStage(id: number, stage: Stage, completed = false): Promise<void> {
-  if (isWeb) return webOrders.updateStatus(id, completed ? 'completed' : 'in_process');
+  if (isWeb) return webOrders.updateStage(id, stage, completed);
   const db = await getDb();
   const now = new Date().toISOString();
   await db.runAsync(
@@ -264,7 +264,7 @@ export async function updateOrderStage(id: number, stage: Stage, completed = fal
 
 /** Moves an order to another production step (index into its own step list). */
 export async function updateOrderProductionStep(id: number, step: number): Promise<void> {
-  if (isWeb) return;
+  if (isWeb) return webOrders.updateProductionStep(id, step);
   const db = await getDb();
   await db.runAsync(`UPDATE orders SET productionStep = ?, updatedAt = ? WHERE id = ?`, step, new Date().toISOString(), id);
   notifyLocalChange();
@@ -272,8 +272,147 @@ export async function updateOrderProductionStep(id: number, step: number): Promi
 
 /** Changes which production steps an order needs (comma-separated keys), restarting at the first. */
 export async function updateOrderProductionSteps(id: number, steps: string): Promise<void> {
-  if (isWeb) return;
+  if (isWeb) return webOrders.updateProductionSteps(id, steps);
   const db = await getDb();
   await db.runAsync(`UPDATE orders SET productionSteps = ?, productionStep = 0, updatedAt = ? WHERE id = ?`, steps, new Date().toISOString(), id);
   notifyLocalChange();
 }
+
+/** Records a sign-off or stage change event in the order's audit trail. */
+export async function addStageEvent(
+  orderId: number,
+  stage: Stage,
+  step: string | null,
+  action: string,
+  actor: string,
+  notes: string | null = null,
+  createdAt?: string
+): Promise<StageEvent> {
+  const ts = createdAt ?? new Date().toISOString();
+  if (isWeb) return webOrders.addStageEvent(orderId, stage, step, action, actor, notes, ts);
+  const db = await getDb();
+  const res = await db.runAsync(
+    `INSERT INTO stage_history (orderId, stage, step, action, actor, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    orderId,
+    stage,
+    step,
+    action,
+    actor,
+    notes,
+    ts
+  );
+  notifyLocalChange();
+  return {
+    id: res.lastInsertRowId,
+    orderId,
+    stage,
+    step,
+    action,
+    actor,
+    notes,
+    createdAt: ts,
+  };
+}
+
+/** Returns the chronological stage and sign-off events for an order. */
+export async function listStageEventsForOrder(orderId: number): Promise<StageEvent[]> {
+  if (isWeb) return webOrders.listStageEvents(orderId);
+  const db = await getDb();
+  return db.getAllAsync<StageEvent>(
+    `SELECT * FROM stage_history WHERE orderId = ? ORDER BY createdAt ASC, id ASC`,
+    orderId
+  );
+}
+
+/** Returns the work ticket checklist items for an order. */
+export async function listOrderItemsForOrder(orderId: number): Promise<OrderItem[]> {
+  if (isWeb) return webOrders.listOrderItems(orderId);
+  const db = await getDb();
+  const rows = await db.getAllAsync<any>(
+    `SELECT * FROM order_items WHERE orderId = ? ORDER BY id ASC`,
+    orderId
+  );
+  return rows.map((r) => ({
+    ...r,
+    isCompleted: Boolean(r.isCompleted),
+  }));
+}
+
+/** Adds a single work ticket checklist item to an order. */
+export async function addOrderItem(
+  orderId: number,
+  item: Omit<OrderItem, 'id' | 'orderId' | 'createdAt'>
+): Promise<OrderItem> {
+  const ts = new Date().toISOString();
+  if (isWeb) return webOrders.addOrderItem(orderId, item);
+  const db = await getDb();
+  const res = await db.runAsync(
+    `INSERT INTO order_items (orderId, description, size, material, process, quantity, completedQty, step, isCompleted, wtNumber, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    orderId,
+    item.description,
+    item.size,
+    item.material,
+    item.process,
+    item.quantity,
+    item.completedQty,
+    item.step,
+    item.isCompleted ? 1 : 0,
+    item.wtNumber,
+    ts
+  );
+  notifyLocalChange();
+  return {
+    id: res.lastInsertRowId,
+    orderId,
+    ...item,
+    createdAt: ts,
+  };
+}
+
+/** Toggles an item's completion checkbox. */
+export async function toggleOrderItemCompleted(id: number, isCompleted: boolean): Promise<void> {
+  if (isWeb) return webOrders.toggleOrderItem(id, isCompleted);
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE order_items SET isCompleted = ?, completedQty = CASE WHEN ? = 1 THEN quantity ELSE completedQty END WHERE id = ?`,
+    isCompleted ? 1 : 0,
+    isCompleted ? 1 : 0,
+    id
+  );
+  notifyLocalChange();
+}
+
+/** Updates an item's completed count (e.g. 25 of 50 cut). */
+export async function updateOrderItemCompletedQty(id: number, completedQty: number): Promise<void> {
+  if (isWeb) return webOrders.updateOrderItemQty(id, completedQty);
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE order_items SET completedQty = ?, isCompleted = CASE WHEN ? >= quantity THEN 1 ELSE 0 END WHERE id = ?`,
+    completedQty,
+    completedQty,
+    id
+  );
+  notifyLocalChange();
+}
+
+/** Deletes a work ticket item. */
+export async function deleteOrderItem(id: number): Promise<void> {
+  if (isWeb) return webOrders.deleteOrderItem(id);
+  const db = await getDb();
+  await db.runAsync(`DELETE FROM order_items WHERE id = ?`, id);
+  notifyLocalChange();
+}
+
+/** Adds a batch of items from a scanned work ticket. */
+export async function addOrderItemsBatch(
+  orderId: number,
+  items: Array<Omit<OrderItem, 'id' | 'orderId' | 'createdAt'>>
+): Promise<OrderItem[]> {
+  const result: OrderItem[] = [];
+  for (const item of items) {
+    const created = await addOrderItem(orderId, item);
+    result.push(created);
+  }
+  return result;
+}
+

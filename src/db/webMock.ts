@@ -6,12 +6,14 @@
  * repositories in orders.ts/mediaItems.ts are used instead.
  */
 import { format } from 'date-fns';
-import type { Client, MediaItem, MediaType, Order, OrderStatus } from '../types/models';
+import type { Client, MediaItem, MediaType, Order, OrderItem, OrderStatus, Stage, StageEvent } from '../types/models';
 import { normalizeCeNumber } from '../utils/ceNumber';
 
 let nextOrderId = 1;
 let nextMediaId = 1;
 let nextClientId = 1;
+let nextStageEventId = 1;
+let nextOrderItemId = 1;
 
 function daysAgoIso(days: number): string {
   const date = new Date();
@@ -364,6 +366,163 @@ const mediaItems: MediaItem[] = [
   },
 ];
 
+const stageEvents: StageEvent[] = [
+  {
+    id: nextStageEventId++,
+    orderId: 1,
+    stage: 0,
+    step: null,
+    action: 'Sample approved',
+    actor: 'Marcus Reyes (Client)',
+    notes: 'Signed off prototype dimensions and acrylic finish in person',
+    createdAt: daysAgoIso(1),
+  },
+  {
+    id: nextStageEventId++,
+    orderId: 1,
+    stage: 1,
+    step: 'machining',
+    action: 'Machining started',
+    actor: 'Thabo',
+    notes: 'Laser-cut plinth components loaded on bed A',
+    createdAt: daysAgoIso(0.5),
+  },
+  {
+    id: nextStageEventId++,
+    orderId: 3,
+    stage: 0,
+    step: null,
+    action: 'Sample approved',
+    actor: 'Marcus Reyes (Client)',
+    notes: 'Approved via email',
+    createdAt: daysAgoIso(10),
+  },
+  {
+    id: nextStageEventId++,
+    orderId: 3,
+    stage: 1,
+    step: 'machining',
+    action: 'Machining completed',
+    actor: 'Thabo',
+    notes: 'CNC router cutting completed',
+    createdAt: daysAgoIso(8),
+  },
+  {
+    id: nextStageEventId++,
+    orderId: 3,
+    stage: 1,
+    step: 'fabricating',
+    action: 'Fabricating completed',
+    actor: 'Sizwe',
+    notes: 'Joined frame and acrylic brackets',
+    createdAt: daysAgoIso(6),
+  },
+  {
+    id: nextStageEventId++,
+    orderId: 3,
+    stage: 1,
+    step: 'finishing',
+    action: 'Finishing completed',
+    actor: 'Thabo',
+    notes: 'Sanded, painted matte black and vinyl applied',
+    createdAt: daysAgoIso(4),
+  },
+  {
+    id: nextStageEventId++,
+    orderId: 3,
+    stage: 2,
+    step: null,
+    action: 'Dispatched',
+    actor: 'Lerato',
+    notes: 'Packed in wooden crate and dispatched via courier',
+    createdAt: daysAgoIso(3),
+  },
+  {
+    id: nextStageEventId++,
+    orderId: 3,
+    stage: 3,
+    step: null,
+    action: 'Installed & signed off',
+    actor: 'Sipho & Thabo',
+    notes: 'Installed in store and signed off with site manager',
+    createdAt: daysAgoIso(2),
+  },
+];
+
+const orderItems: OrderItem[] = [
+  {
+    id: nextOrderItemId++,
+    orderId: 1,
+    description: '350 Brand Lightbox Skin',
+    size: 'H350 x W1202',
+    material: 'Lightbox Fabric Skin',
+    process: 'Print & Trim',
+    quantity: 42,
+    completedQty: 42,
+    step: 'machining',
+    isCompleted: true,
+    wtNumber: null,
+    createdAt: daysAgoIso(9),
+  },
+  {
+    id: nextOrderItemId++,
+    orderId: 1,
+    description: '580 Brand Lightbox Skin',
+    size: 'H580 x W1202',
+    material: 'Lightbox Fabric Skin',
+    process: 'Print & Trim',
+    quantity: 35,
+    completedQty: 35,
+    step: 'machining',
+    isCompleted: true,
+    wtNumber: null,
+    createdAt: daysAgoIso(9),
+  },
+  {
+    id: nextOrderItemId++,
+    orderId: 1,
+    description: 'Quad Feature Brand Lightbox Skin',
+    size: 'H1200 x W580',
+    material: 'Lightbox Fabric Skin',
+    process: 'Print & Trim',
+    quantity: 51,
+    completedQty: 25,
+    step: 'fabricating',
+    isCompleted: false,
+    wtNumber: null,
+    createdAt: daysAgoIso(9),
+  },
+  {
+    id: nextOrderItemId++,
+    orderId: 1,
+    description: 'Podium Graphic',
+    size: '400 x 400mm',
+    material: '5mm Foam Board',
+    process: 'Full Colour 1-side, Trim to Size',
+    quantity: 50,
+    completedQty: 0,
+    step: 'finishing',
+    isCompleted: false,
+    wtNumber: null,
+    createdAt: daysAgoIso(9),
+  },
+  {
+    id: nextOrderItemId++,
+    orderId: 2,
+    description: 'Key Chain Letters - 20',
+    size: null,
+    material: '3mm White PlexiGlass, White, 300gsm',
+    process: 'Laser cut',
+    quantity: 20,
+    completedQty: 20,
+    step: 'machining',
+    isCompleted: true,
+    wtNumber: '14752',
+    createdAt: daysAgoIso(4),
+  },
+];
+
+
 function coverImageFor(orderId: number): string | null {
   const photos = mediaItems
     .filter((m) => m.orderId === orderId && m.type === 'photo')
@@ -509,6 +668,88 @@ export const webOrders = {
     order.updatedAt = new Date().toISOString();
     order.completedAt = status === 'completed' ? new Date().toISOString() : null;
   },
+  async updateStage(id: number, stage: Stage, completed = false): Promise<void> {
+    const order = orders.find((o) => o.id === id);
+    if (!order) return;
+    order.stage = stage;
+    order.status = completed ? 'completed' : 'in_process';
+    order.completedAt = completed ? new Date().toISOString() : null;
+    order.updatedAt = new Date().toISOString();
+  },
+  async updateProductionStep(id: number, step: number): Promise<void> {
+    const order = orders.find((o) => o.id === id);
+    if (!order) return;
+    order.productionStep = step;
+    order.updatedAt = new Date().toISOString();
+  },
+  async updateProductionSteps(id: number, steps: string): Promise<void> {
+    const order = orders.find((o) => o.id === id);
+    if (!order) return;
+    order.productionSteps = steps;
+    order.productionStep = 0;
+    order.updatedAt = new Date().toISOString();
+  },
+  async addStageEvent(
+    orderId: number,
+    stage: Stage,
+    step: string | null,
+    action: string,
+    actor: string,
+    notes: string | null = null,
+    createdAt?: string
+  ): Promise<StageEvent> {
+    const event: StageEvent = {
+      id: nextStageEventId++,
+      orderId,
+      stage,
+      step,
+      action,
+      actor,
+      notes,
+      createdAt: createdAt ?? new Date().toISOString(),
+    };
+    stageEvents.push(event);
+    return event;
+  },
+  async listStageEvents(orderId: number): Promise<StageEvent[]> {
+    return stageEvents
+      .filter((e) => e.orderId === orderId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+  async listOrderItems(orderId: number): Promise<OrderItem[]> {
+    return orderItems.filter((i) => i.orderId === orderId);
+  },
+  async addOrderItem(
+    orderId: number,
+    item: Omit<OrderItem, 'id' | 'orderId' | 'createdAt'>
+  ): Promise<OrderItem> {
+    const newItem: OrderItem = {
+      ...item,
+      id: nextOrderItemId++,
+      orderId,
+      createdAt: new Date().toISOString(),
+    };
+    orderItems.push(newItem);
+    return newItem;
+  },
+  async toggleOrderItem(id: number, isCompleted: boolean): Promise<void> {
+    const item = orderItems.find((i) => i.id === id);
+    if (item) {
+      item.isCompleted = isCompleted;
+      if (isCompleted) item.completedQty = item.quantity;
+    }
+  },
+  async updateOrderItemQty(id: number, completedQty: number): Promise<void> {
+    const item = orderItems.find((i) => i.id === id);
+    if (item) {
+      item.completedQty = Math.max(0, Math.min(completedQty, item.quantity));
+      item.isCompleted = item.completedQty >= item.quantity;
+    }
+  },
+  async deleteOrderItem(id: number): Promise<void> {
+    const index = orderItems.findIndex((i) => i.id === id);
+    if (index !== -1) orderItems.splice(index, 1);
+  },
   async search(rawPartial: string): Promise<Order[]> {
     const partial = normalizeCeNumber(rawPartial);
     if (!partial) return [];
@@ -524,6 +765,12 @@ export const webOrders = {
     if (index !== -1) orders.splice(index, 1);
     for (let i = mediaItems.length - 1; i >= 0; i--) {
       if (mediaItems[i].orderId === id) mediaItems.splice(i, 1);
+    }
+    for (let i = stageEvents.length - 1; i >= 0; i--) {
+      if (stageEvents[i].orderId === id) stageEvents.splice(i, 1);
+    }
+    for (let i = orderItems.length - 1; i >= 0; i--) {
+      if (orderItems[i].orderId === id) orderItems.splice(i, 1);
     }
   },
 };

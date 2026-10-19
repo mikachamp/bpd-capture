@@ -1,0 +1,125 @@
+[
+  {
+    "ce_number": "9540/1",
+    "sales_order_no": "S5942",
+    "customer": "Foschini Retail Group (Pty) Ltd",
+    "reference": "JD - Hemmingsway",
+    "order_no": "CO00357631",
+    "contact_name": "Nkosingiphile Dlamini",
+    "contact_email": "NkosingiphileD@tfg.co.za",
+    "created_by": "Ralton",
+    "sales_rep": "Oscar",
+    "created_date": "08/09/26",
+    "customer_req_date": "18/09/2026",
+    "production_due_date": "18/09/2026",
+    "notes": "Handwritten on floor: DONE 23/09/26",
+    "items": [
+      {
+        "description": "350 BRAND LIGHTBOX SKIN",
+        "size": "H350 x W1202",
+        "material": "Lightbox Fabric Skin",
+        "process": "Print & Trim",
+        "quantity": 42,
+        "step": "finishing"
+      },
+      {
+        "description": "580 BRAND LIGHTBOX SKIN",
+        "size": "H580 x W1202",
+        "material": "Lightbox Fabric Skin",
+        "process": "Print & Trim",
+        "quantity": 35,
+        "step": "finishing"
+      },
+      {
+        "description": "QUAD FEATURE BRAND LIGHTBOX SKIN",
+        "size": "H1200 X W580",
+        "material": "Lightbox Fabric Skin",
+        "process": "Print & Trim",
+        "quantity": 51,
+        "step": "finishing"
+      },
+      {
+        "description": "1202 x 1202 Lightbox Skin Pack",
+        "size": "1202 x 1202",
+        "material": "Skin Pack",
+        "process": "Print & Trim",
+        "quantity": 21,
+        "step": "finishing"
+      },
+      {
+        "description": "Junior Quad Feature Skin Pack",
+        "size": "1202H x 350W",
+        "material": "Skin Pack",
+        "process": "Print & Trim",
+        "quantity": 11,
+        "step": "finishing"
+      },
+      {
+        "description": "KIDS Magnetic Footwear Lightbox Skin Pack",
+        "size": "600x600mm",
+        "material": "Magnetic Sheet & Print",
+        "process": "Mount & Trim",
+        "quantity": 15,
+        "step": "fabricating"
+      },
+      {
+        "description": "Storyteller Volle - Replica Skins 1202 x 580 - MENS",
+        "size": "1580x544mm",
+        "material": "Replica Skins",
+        "process": "Print & Trim",
+        "quantity": 1,
+        "step": "finishing"
+      },
+      {
+        "description": "Storyteller Volle - Replica Skins 1202 x 350 - Womans",
+        "size": "1580x544mm",
+        "material": "Replica Skins",
+        "process": "Print & Trim",
+        "quantity": 1,
+        "step": "finishing"
+      },
+      {
+        "description": "Storyteller Volle - 544 x 1580 - Junior",
+        "size": "1580x544mm",
+        "material": "Replica Skins",
+        "process": "Print & Trim",
+        "quantity": 1,
+        "step": "finishing"
+      },
+      {
+        "description": "Podium Graphic",
+        "size": "400x400mm",
+        "material": "5mm Foam Board",
+        "process": "Full Colour - One side only, Trimmed to Size",
+        "quantity": 50,
+        "step": "finishing"
+      }
+    ]
+  },
+  {
+    "ce_number": "7750/1",
+    "sales_order_no": "S4875",
+    "customer": "Dime 3",
+    "reference": "Key Chain Letters",
+    "dispatch_method": "CLIENT COLLECTION",
+    "contact_name": "Mika Williamson",
+    "contact_email": "mika@dime3.co.za",
+    "contact_phone": "072 194 1776",
+    "created_by": "Tendai",
+    "sales_rep": "Oscar",
+    "created_date": "12/09/25",
+    "customer_req_date": "16/09/2025",
+    "production_due_date": "16/09/2025",
+    "items": [
+      {
+        "description": "Key Chain Letters - 20",
+        "size": null,
+        "material": "3mm White PlexiGlass, White, 300gsm",
+        "process": "Laser cut",
+        "quantity": 20,
+        "wt_number": "14752",
+        "step": "machining"
+      }
+    ]
+  }
+]

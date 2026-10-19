@@ -1,5 +1,5 @@
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
-import { MIGRATIONS_SQL, SCHEMA_SQL, SCHEMA_VERSION, STAGE_MIGRATION_SQL, STEPS_MIGRATION_SQL, SYNC_MIGRATION_SQL } from './schema';
+import { MIGRATIONS_SQL, ORDER_ITEMS_MIGRATION_SQL, SCHEMA_SQL, SCHEMA_VERSION, STAGE_HISTORY_MIGRATION_SQL, STAGE_MIGRATION_SQL, STEPS_MIGRATION_SQL, SYNC_MIGRATION_SQL } from './schema';
 import { markExistingDemoRows } from './demoData';
 
 let dbPromise: Promise<SQLiteDatabase> | null = null;
@@ -41,6 +41,20 @@ export async function initDatabase(): Promise<void> {
   if (version < 4) {
     await db.withTransactionAsync(async () => {
       for (const statement of STEPS_MIGRATION_SQL) {
+        await db.execAsync(statement);
+      }
+    });
+  }
+  if (version < 5) {
+    await db.withTransactionAsync(async () => {
+      for (const statement of STAGE_HISTORY_MIGRATION_SQL) {
+        await db.execAsync(statement);
+      }
+    });
+  }
+  if (version < 6) {
+    await db.withTransactionAsync(async () => {
+      for (const statement of ORDER_ITEMS_MIGRATION_SQL) {
         await db.execAsync(statement);
       }
     });

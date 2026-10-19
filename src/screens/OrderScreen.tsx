@@ -1,16 +1,16 @@
 import { useCallback, useState } from 'react';
-import { ActionSheetIOS, Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActionSheetIOS, Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import type { RootStackParamList } from '../navigation/types';
-import { deleteOrder, getOrderById, updateOrderProductionStep, updateOrderProductionSteps, updateOrderStage } from '../db/orders';
+import { addStageEvent, deleteOrder, getOrderById, listOrderItemsForOrder, listStageEventsForOrder, toggleOrderItemCompleted, updateOrderItemCompletedQty, updateOrderProductionStep, updateOrderProductionSteps, updateOrderStage } from '../db/orders';
 import { deleteMediaItem, listMediaForOrder } from '../db/mediaItems';
 import { deleteMediaFile, deleteOrderDirectory } from '../services/storage';
 import { exportAndShareJobReport } from '../services/reportPdf';
 import { onSyncedData } from '../sync/syncService';
-import type { MediaItem, Order, Stage } from '../types/models';
+import type { MediaItem, Order, OrderItem, Stage, StageEvent } from '../types/models';
 import { PRODUCTION_STEPS, STAGES, currentStep, nextStepLabel, stageLabel, stepLabel, stepsFor, type ProductionStepKey } from '../utils/stages';
 import { Icon } from '../components/Icon';
 import { MediaPreview } from '../components/MediaGrid';
@@ -39,14 +39,41 @@ export function OrderScreen({ route, navigation }: Props) {
   const { orderId } = route.params;
   const [order, setOrder] = useState<Order | null>(null);
   const [media, setMedia] = useState<MediaItem[]>([]);
+  const [history, setHistory] = useState<StageEvent[]>([]);
   const [preview, setPreview] = useState<MediaItem | null>(null);
   const [exporting, setExporting] = useState<'client' | 'internal' | null>(null);
   const [editingSteps, setEditingSteps] = useState<ProductionStepKey[] | null>(null);
 
+  type SignOffPrompt = {
+    title: string;
+    subtitle: string;
+    action: string;
+    stage: Stage;
+    step: string | null;
+    defaultActor: string;
+    defaultNotes: string;
+    isReopen?: boolean;
+    isProductionStepAdvance?: boolean;
+    nextStepIndex?: number;
+    nextStage?: Stage;
+    isComplete?: boolean;
+  };
+  const [signOffPrompt, setSignOffPrompt] = useState<SignOffPrompt | null>(null);
+  const [signOffActor, setSignOffActor] = useState('');
+  const [signOffNotes, setSignOffNotes] = useState('');
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+
   const reload = useCallback(async () => {
-    const [fresh, items] = await Promise.all([getOrderById(orderId), listMediaForOrder(orderId)]);
+    const [fresh, items, events, ticketItems] = await Promise.all([
+      getOrderById(orderId),
+      listMediaForOrder(orderId),
+      listStageEventsForOrder(orderId),
+      listOrderItemsForOrder(orderId),
+    ]);
     setOrder(fresh);
     setMedia(items);
+    setHistory(events);
+    setOrderItems(ticketItems);
   }, [orderId]);
 
   useFocusEffect(useCallback(() => { void reload(); }, [reload]));
@@ -70,13 +97,137 @@ export function OrderScreen({ route, navigation }: Props) {
   const step = currentStep(order);
   const stepIndex = Math.min(order.productionStep ?? 0, Math.max(steps.length - 1, 0));
 
-  const advance = async () => {
-    if (completed) await updateOrderStage(order.id, 3, false);
-    else if (stage === 1 && steps.length > 0 && stepIndex < steps.length - 1) await updateOrderProductionStep(order.id, stepIndex + 1);
-    else if (stage < 3) {
-      await updateOrderStage(order.id, (stage + 1) as Stage);
-      if (stage === 0) await updateOrderProductionStep(order.id, 0);
-    } else await updateOrderStage(order.id, 3, true);
+  const openSignOffAdvance = () => {
+    if (completed) {
+      setSignOffActor('Thabo');
+      setSignOffNotes('Reopened for inspection/adjustments');
+      setSignOffPrompt({
+        title: 'Reopen Order',
+        subtitle: 'Move order back to in-process at Installed stage.',
+        action: 'Reopened order',
+        stage: 3,
+        step: null,
+        defaultActor: 'Thabo',
+        defaultNotes: 'Reopened for inspection/adjustments',
+        isReopen: true,
+      });
+      return;
+    }
+    if (stage === 0) {
+      const actor = order.clientName ? `${order.clientName} (Client)` : 'Client';
+      const notes = 'Sample approved for full production';
+      setSignOffActor(actor);
+      setSignOffNotes(notes);
+      setSignOffPrompt({
+        title: 'Client Sample Approval',
+        subtitle: 'Record client approval before starting Production.',
+        action: 'Sample approved',
+        stage: 0,
+        step: null,
+        defaultActor: actor,
+        defaultNotes: notes,
+        nextStage: 1,
+      });
+      return;
+    }
+    if (stage === 1) {
+      const curStep = steps[stepIndex];
+      if (steps.length > 0 && stepIndex < steps.length - 1) {
+        const nextStep = steps[stepIndex + 1];
+        const actor = 'Thabo';
+        const notes = `${stepLabel(curStep)} complete, tolerance checked`;
+        setSignOffActor(actor);
+        setSignOffNotes(notes);
+        setSignOffPrompt({
+          title: `${stepLabel(curStep)} Sign-Off`,
+          subtitle: `Hand off from ${stepLabel(curStep)} to ${stepLabel(nextStep)}.`,
+          action: `${stepLabel(curStep)} completed`,
+          stage: 1,
+          step: curStep,
+          defaultActor: actor,
+          defaultNotes: notes,
+          isProductionStepAdvance: true,
+          nextStepIndex: stepIndex + 1,
+        });
+        return;
+      }
+      const actor = 'Thabo';
+      const notes = 'All manufacturing steps completed and checked';
+      setSignOffActor(actor);
+      setSignOffNotes(notes);
+      setSignOffPrompt({
+        title: 'Production Complete',
+        subtitle: 'Manufacturing complete. Move order to Dispatch.',
+        action: curStep ? `${stepLabel(curStep)} completed` : 'Production completed',
+        stage: 1,
+        step: curStep ?? null,
+        defaultActor: actor,
+        defaultNotes: notes,
+        nextStage: 2,
+      });
+      return;
+    }
+    if (stage === 2) {
+      const actor = 'Lerato';
+      const notes = 'Packed and dispatched to site';
+      setSignOffActor(actor);
+      setSignOffNotes(notes);
+      setSignOffPrompt({
+        title: 'Dispatch Sign-Off',
+        subtitle: 'Order crated, packed, and leaving workshop.',
+        action: 'Dispatched',
+        stage: 2,
+        step: null,
+        defaultActor: actor,
+        defaultNotes: notes,
+        nextStage: 3,
+      });
+      return;
+    }
+    if (stage === 3) {
+      const actor = 'Thabo & Sipho';
+      const notes = 'Installed in store and signed off with site manager';
+      setSignOffActor(actor);
+      setSignOffNotes(notes);
+      setSignOffPrompt({
+        title: 'Installation Sign-Off',
+        subtitle: 'Installation completed on site with final client sign-off.',
+        action: 'Installed & signed off',
+        stage: 3,
+        step: null,
+        defaultActor: actor,
+        defaultNotes: notes,
+        isComplete: true,
+      });
+      return;
+    }
+  };
+
+  const confirmSignOff = async () => {
+    if (!signOffPrompt) return;
+    const actor = signOffActor.trim() || signOffPrompt.defaultActor;
+    const notes = signOffNotes.trim() || null;
+    await addStageEvent(
+      order.id,
+      signOffPrompt.stage,
+      signOffPrompt.step,
+      signOffPrompt.action,
+      actor,
+      notes
+    );
+
+    if (signOffPrompt.isReopen) {
+      await updateOrderStage(order.id, 3, false);
+    } else if (signOffPrompt.isProductionStepAdvance && signOffPrompt.nextStepIndex !== undefined) {
+      await updateOrderProductionStep(order.id, signOffPrompt.nextStepIndex);
+    } else if (signOffPrompt.isComplete) {
+      await updateOrderStage(order.id, 3, true);
+    } else if (signOffPrompt.nextStage !== undefined) {
+      await updateOrderStage(order.id, signOffPrompt.nextStage);
+      if (signOffPrompt.nextStage === 1) await updateOrderProductionStep(order.id, 0);
+    }
+
+    setSignOffPrompt(null);
     await reload();
   };
 
@@ -101,6 +252,17 @@ export function OrderScreen({ route, navigation }: Props) {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Move back', onPress: async () => { await updateOrderStage(order.id, target, false); await reload(); } },
     ]);
+  };
+
+  const toggleItem = async (item: OrderItem) => {
+    await toggleOrderItemCompleted(item.id, !item.isCompleted);
+    await reload();
+  };
+
+  const changeItemQty = async (item: OrderItem, delta: number) => {
+    const next = Math.max(0, Math.min(item.quantity, item.completedQty + delta));
+    await updateOrderItemCompletedQty(item.id, next);
+    await reload();
   };
 
   const openCamera = () => navigation.navigate('Capture', { orderId: order.id, ceNumber: order.ceNumber, stage: completed ? 3 : stage, step });
@@ -191,10 +353,141 @@ export function OrderScreen({ route, navigation }: Props) {
 
         <View style={styles.next}>
           <Text style={styles.nextText}>{completed ? 'This order is complete.' : step ? `${stepLabel(step)} · ${PRODUCTION_STEPS.find((p) => p.key === step)?.hint}` : STAGES[stage].hint}</Text>
-          <Pressable style={styles.nextBtn} onPress={advance}>
+          <Pressable style={styles.nextBtn} onPress={openSignOffAdvance}>
             <Icon name="check" size={16} color={colors.selectedText} strokeWidth={2} />
             <Text style={styles.nextBtnText}>{nextStepLabel(order, stageMedia(stage).length > 0)}</Text>
           </Pressable>
+        </View>
+
+        <View style={styles.historySection}>
+          <View style={styles.sectionHead}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+              <Icon name="check" size={16} color={colors.accent} strokeWidth={2.4} />
+              <Text style={styles.sectionTitle}>Stage History & Sign-Offs</Text>
+            </View>
+            <Text style={styles.sectionMeta}>{history.length} sign-off{history.length === 1 ? '' : 's'}</Text>
+          </View>
+          {history.length === 0 ? (
+            <View style={styles.emptyHistory}>
+              <Text style={styles.emptyHistoryText}>No sign-offs recorded yet. Advancing each stage records who moved it and when.</Text>
+            </View>
+          ) : (
+            <View style={styles.historyTimeline}>
+              {history.map((event, idx) => {
+                const isLast = idx === history.length - 1;
+                const eventDate = parseISO(event.createdAt);
+                const dateStr = format(eventDate, 'd MMM, HH:mm');
+                const badgeColor =
+                  event.stage === 0 ? '#D29922' :
+                  event.stage === 1 ? colors.accent :
+                  event.stage === 2 ? '#58A6FF' : colors.success;
+                return (
+                  <View key={event.id} style={styles.historyItem}>
+                    {!isLast && <View style={styles.historyLine} />}
+                    <View style={[styles.historyDot, { borderColor: badgeColor }]}>
+                      <View style={[styles.historyDotInner, { backgroundColor: badgeColor }]} />
+                    </View>
+                    <View style={styles.historyBody}>
+                      <View style={styles.historyRow}>
+                        <Text style={styles.historyAction}>{event.action}</Text>
+                        <Text style={styles.historyTime}>{dateStr}</Text>
+                      </View>
+                      <Text style={styles.historyActor}>By <Text style={styles.historyActorBold}>{event.actor}</Text></Text>
+                      {event.notes ? <Text style={styles.historyNotes}>“{event.notes}”</Text> : null}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* Work Ticket Checklist Section */}
+        <View style={styles.checklistSection}>
+          <View style={styles.sectionHead}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+              <Icon name="list" size={16} color={colors.accent} strokeWidth={2.4} />
+              <Text style={styles.sectionTitle}>Work Ticket Checklist</Text>
+            </View>
+            <Text style={styles.sectionMeta}>
+              {orderItems.filter((i) => i.isCompleted).length}/{orderItems.length} completed
+            </Text>
+          </View>
+
+          {orderItems.length === 0 ? (
+            <View style={styles.emptyChecklist}>
+              <Text style={styles.emptyChecklistText}>No ticket items recorded yet. Scan or add items from the physical work ticket.</Text>
+            </View>
+          ) : (
+            <View style={styles.checklistItems}>
+              {orderItems.map((item) => (
+                <View key={item.id} style={[styles.checklistItem, item.isCompleted && styles.checklistItemDone]}>
+                  <Pressable
+                    style={[styles.checkbox, item.isCompleted && styles.checkboxChecked]}
+                    onPress={() => toggleItem(item)}
+                    accessibilityLabel={`Toggle ${item.description}`}
+                  >
+                    {item.isCompleted && <Icon name="check" size={14} color={colors.accentInk} strokeWidth={2.6} />}
+                  </Pressable>
+
+                  <View style={styles.itemInfo}>
+                    <View style={styles.itemTitleRow}>
+                      <Text style={[styles.itemTitle, item.isCompleted && styles.itemTitleDone]}>
+                        {item.description}
+                      </Text>
+                      {item.step && (
+                        <View style={styles.stepBadge}>
+                          <Text style={styles.stepBadgeText}>{stepLabel(item.step)}</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={styles.itemMetaRow}>
+                      {item.size ? <Text style={styles.itemSizeBadge}>{item.size}</Text> : null}
+                      {item.material ? (
+                        <Text style={styles.itemMaterial} numberOfLines={1}>
+                          {item.material}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {item.process ? (
+                      <Text style={styles.itemProcess} numberOfLines={1}>
+                        {item.process}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.qtyContainer}>
+                    {item.quantity > 1 ? (
+                      <View style={styles.qtyStepper}>
+                        <Pressable
+                          style={styles.qtyBtn}
+                          onPress={() => changeItemQty(item, -1)}
+                          disabled={item.completedQty <= 0}
+                        >
+                          <Text style={[styles.qtyBtnText, item.completedQty <= 0 && styles.qtyBtnDisabled]}>−</Text>
+                        </Pressable>
+                        <Text style={[styles.qtyText, item.isCompleted && styles.qtyTextDone]}>
+                          {item.completedQty}/{item.quantity}
+                        </Text>
+                        <Pressable
+                          style={styles.qtyBtn}
+                          onPress={() => changeItemQty(item, 1)}
+                          disabled={item.completedQty >= item.quantity}
+                        >
+                          <Text style={[styles.qtyBtnText, item.completedQty >= item.quantity && styles.qtyBtnDisabled]}>+</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <Text style={[styles.singleQtyBadge, item.isCompleted && styles.singleQtyBadgeDone]}>
+                        1×
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         {STAGES.map((s) => {
@@ -291,6 +584,57 @@ export function OrderScreen({ route, navigation }: Props) {
         </Pressable>
       </View>
 
+      <Modal visible={signOffPrompt !== null} transparent animationType="fade" onRequestClose={() => setSignOffPrompt(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setSignOffPrompt(null)}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <Text style={styles.sheetTitle}>{signOffPrompt?.title}</Text>
+            <Text style={styles.sheetSub}>{signOffPrompt?.subtitle}</Text>
+
+            <Text style={styles.inputLabel}>Signed off by / Operator</Text>
+            <TextInput
+              style={styles.sheetInput}
+              value={signOffActor}
+              onChangeText={setSignOffActor}
+              placeholder={signOffPrompt?.defaultActor}
+              placeholderTextColor={colors.textMuted}
+            />
+
+            <View style={styles.quickPills}>
+              {['Thabo', 'Sizwe', 'Lerato', order.clientName ? `${order.clientName} (Client)` : 'Client'].map((name) => (
+                <Pressable
+                  key={name}
+                  style={[styles.quickPill, signOffActor === name && styles.quickPillActive]}
+                  onPress={() => setSignOffActor(name)}
+                >
+                  <Text style={[styles.quickPillText, signOffActor === name && styles.quickPillTextActive]}>{name}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>Sign-off notes (optional)</Text>
+            <TextInput
+              style={[styles.sheetInput, styles.sheetTextarea]}
+              value={signOffNotes}
+              onChangeText={setSignOffNotes}
+              placeholder="e.g. Dimensions checked, QC passed, approved in person"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              numberOfLines={3}
+            />
+
+            <View style={styles.modalBtnRow}>
+              <Pressable style={styles.modalCancelBtn} onPress={() => setSignOffPrompt(null)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.modalConfirmBtn} onPress={confirmSignOff}>
+                <Icon name="check" size={16} color={colors.accentInk} strokeWidth={2.4} />
+                <Text style={styles.modalConfirmText}>Confirm & Sign Off</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <Modal visible={editingSteps !== null} transparent animationType="fade" onRequestClose={() => setEditingSteps(null)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setEditingSteps(null)}>
           <Pressable style={styles.sheet} onPress={() => {}}>
@@ -370,6 +714,48 @@ const styles = StyleSheet.create({
   nextText: { fontFamily: fonts.family, fontSize: 14, lineHeight: 21, color: colors.textSecondary },
   nextBtn: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: spacing.lg, borderRadius: radius.pill, backgroundColor: colors.selected },
   nextBtnText: { fontFamily: fonts.family, fontSize: 14, color: colors.selectedText },
+  historySection: { marginTop: spacing.xl, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
+  historyTimeline: { marginTop: spacing.xs },
+  historyItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.md, position: 'relative' },
+  historyLine: { position: 'absolute', left: 7, top: 16, bottom: -16, width: 2, backgroundColor: colors.border },
+  historyDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, marginRight: spacing.md, marginTop: 2 },
+  historyDotInner: { width: 6, height: 6, borderRadius: 3 },
+  historyBody: { flex: 1, backgroundColor: colors.surfaceMuted, borderRadius: radius.md, padding: spacing.md, gap: 2 },
+  historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  historyAction: { fontFamily: fonts.family, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  historyTime: { fontFamily: fonts.family, fontSize: 12, color: colors.textMuted },
+  historyActor: { fontFamily: fonts.family, fontSize: 13, color: colors.textSecondary },
+  historyActorBold: { color: colors.textPrimary, fontWeight: '500' },
+  historyNotes: { fontFamily: fonts.family, fontSize: 12.5, fontStyle: 'italic', color: colors.textSecondary, marginTop: 4, lineHeight: 18 },
+  emptyHistory: { paddingVertical: spacing.md, alignItems: 'center' },
+  emptyHistoryText: { fontFamily: fonts.family, fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
+  checklistSection: { marginTop: spacing.xl, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md },
+  emptyChecklist: { paddingVertical: spacing.md, alignItems: 'center' },
+  emptyChecklistText: { fontFamily: fonts.family, fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 18 },
+  checklistItems: { gap: spacing.sm },
+  checklistItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceMuted, borderRadius: radius.md, padding: spacing.md, gap: spacing.md, borderWidth: 1, borderColor: colors.border },
+  checklistItemDone: { opacity: 0.65, borderColor: 'transparent' },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  checkboxChecked: { backgroundColor: colors.success, borderColor: colors.success },
+  itemInfo: { flex: 1, gap: 3 },
+  itemTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },
+  itemTitle: { fontFamily: fonts.family, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  itemTitleDone: { textDecorationLine: 'line-through', color: colors.textSecondary },
+  stepBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: colors.surface },
+  stepBadgeText: { fontFamily: fonts.family, fontSize: 10.5, color: colors.accent, fontWeight: '500' },
+  itemMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  itemSizeBadge: { fontFamily: fonts.family, fontSize: 11, color: colors.textMuted, backgroundColor: colors.surface, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
+  itemMaterial: { fontFamily: fonts.family, fontSize: 11.5, color: colors.textSecondary },
+  itemProcess: { fontFamily: fonts.family, fontSize: 11, color: colors.textMuted, fontStyle: 'italic' },
+  qtyContainer: { alignItems: 'flex-end', justifyContent: 'center' },
+  qtyStepper: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: 4, paddingVertical: 2, gap: 4, borderWidth: 1, borderColor: colors.border },
+  qtyBtn: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceMuted },
+  qtyBtnText: { fontFamily: fonts.family, fontSize: 14, fontWeight: '600', color: colors.textPrimary, lineHeight: 16 },
+  qtyBtnDisabled: { color: colors.textMuted, opacity: 0.4 },
+  qtyText: { fontFamily: fonts.family, fontSize: 12, fontWeight: '600', color: colors.textPrimary, minWidth: 32, textAlign: 'center' },
+  qtyTextDone: { color: colors.success },
+  singleQtyBadge: { fontFamily: fonts.family, fontSize: 12, fontWeight: '600', color: colors.textSecondary, backgroundColor: colors.surface, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill },
+  singleQtyBadgeDone: { color: colors.success },
   section: { marginTop: spacing.xl },
   future: { opacity: 0.45 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: spacing.sm },
@@ -406,6 +792,19 @@ const styles = StyleSheet.create({
   sheetRowSub: { fontFamily: fonts.family, fontSize: 12.5, color: colors.textMuted },
   sheetSave: { height: 52, borderRadius: radius.pill, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
   sheetSaveText: { fontFamily: fonts.family, fontSize: 16, fontWeight: '500', color: colors.accentInk },
+  inputLabel: { fontFamily: fonts.family, fontSize: 12.5, fontWeight: '500', color: colors.textSecondary, marginTop: spacing.xs },
+  sheetInput: { backgroundColor: colors.surfaceMuted, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.textPrimary, fontFamily: fonts.family, fontSize: 14, borderWidth: 1, borderColor: colors.border },
+  sheetTextarea: { minHeight: 64, textAlignVertical: 'top' },
+  quickPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2, marginBottom: spacing.xs },
+  quickPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.surfaceMuted, borderWidth: 1, borderColor: colors.border },
+  quickPillActive: { backgroundColor: colors.selected, borderColor: colors.accent },
+  quickPillText: { fontFamily: fonts.family, fontSize: 12, color: colors.textSecondary },
+  quickPillTextActive: { color: colors.textPrimary, fontWeight: '500' },
+  modalBtnRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
+  modalCancelBtn: { flex: 1, height: 48, borderRadius: radius.pill, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center' },
+  modalCancelText: { fontFamily: fonts.family, fontSize: 15, color: colors.textSecondary },
+  modalConfirmBtn: { flex: 2, height: 48, borderRadius: radius.pill, backgroundColor: colors.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  modalConfirmText: { fontFamily: fonts.family, fontSize: 15, fontWeight: '500', color: colors.accentInk },
   bottom: { position: 'absolute', left: spacing.xl, right: spacing.xl, bottom: spacing.xl },
   primary: { height: 56, borderRadius: radius.pill, backgroundColor: colors.accent, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, ...{ elevation: 6 } },
   primaryText: { fontFamily: fonts.family, fontSize: 16, fontWeight: '500', color: colors.accentInk },
