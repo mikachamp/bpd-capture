@@ -9,6 +9,7 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { StartupAnimation } from './src/components/StartupAnimation';
 import { saveStartupVideoOnce } from './src/services/brandVideo';
 import { startSync } from './src/sync/syncService';
+import { isFloor } from './src/theme/theme';
 
 export default function App() {
   const [isBootstrapped, setIsBootstrapped] = useState(false);
@@ -40,7 +41,8 @@ export default function App() {
     <GestureHandlerRootView style={styles.flex}>
       <SafeAreaProvider>
         <RootNavigator />
-        <StatusBar style="auto" />
+        {/* Ink & ember is dark: light icons. Floor Mode is light: dark icons (its coloured order band sets light itself). */}
+        <StatusBar style={isFloor ? 'dark' : 'light'} />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
