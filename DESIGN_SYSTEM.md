@@ -40,6 +40,78 @@ Source of truth in code:
 
 ---
 
+## 1b. Floor Mode — test build "BPD Capture Floor" (branch `floor`)
+
+Built 2026-10-21 from style direction **C · Floor Mode** (the user's pick from
+https://claude.ai/artifact/Dq4WHm6qCv8yQ9RW1H3qqw), with **C2 Night Shift** and **C3 stage
+colours** folded in. `APP_VARIANT=floor` gives its own package (`…bpdcapture.floor`), name, data
+and sync branch (`data-floor`). Every screen reads `colors` from `theme.ts`, which swaps in the
+Floor palette when the package name ends in `.floor`; the Jobs list, Order screen and tab bar
+have Floor-only layouts (`FloorJobsScreen.tsx`, `FloorOrderScreen.tsx`, `FloorTabBar`).
+
+**Principles**
+1. **Made for the bench:** gloves, dust, bright light. Primary actions are **64 dp** tall,
+   everything tappable is **at least 48 dp** (counter buttons 56 × 64). No small dropdowns, no
+   swipe-only actions.
+2. **Two things to do on an order:** *Take photo* (charcoal) and *"<step> done"* (safety yellow).
+   Everything else sits lower down.
+3. **Yellow means "act now"** and is used for nothing else: the done button, the Capture tab,
+   the bench name. Stage colours are never yellow.
+4. **Stage colour tells you where a job is from across the room:** the order's top band and
+   each job row's left edge use the stage colour (red edge when late).
+5. **Night Shift** (dark) for installers: Settings → Workshop team → Night Shift: Auto (on for
+   jobs at Installed), Always on, Off.
+6. Same rules as below: no emoji, destructive actions confirmed, project name first.
+
+**Palette (`floorDay` / `nightColors` in `theme.ts`)**
+
+| Token | Day | Night | Used for |
+|---|---|---|---|
+| `background` | `#D5D7D3` concrete | `#15171A` | Screen ground |
+| `surface` | `#ECEDEA` | `#23262B` | Rows, inputs, counters |
+| `surfaceMuted` | `#E1E3DF` | `#2E3238` | − / + buttons |
+| `border` | `#B9BCB7` | `#3A3F46` | Hairlines, empty stage ticks |
+| `textPrimary` | `#202326` charcoal | `#F1F2EE` | Text, Take photo button |
+| `textMuted` | `#5A5F64` | `#A2A7AD` | Labels, meta |
+| `accent` | `#F2C12E` safety yellow | same | The one "do this now" action |
+| `accentInk` | `#202326` | same | Text on yellow |
+| `danger` | `#B83A22` | `#F06A4E` | Late, on hold, delete |
+| `success` | `#2E7D4F` | `#5FBF8A` | Item fully counted |
+
+Stage colours (`stageColors`): Sample `#6B5CA5` violet · Production `#2F5DB5` blue ·
+Dispatch `#2E8063` green · Installed `#202326` charcoal. White text on all four.
+
+**Type:** Barlow (400–700) for text, **Barlow Condensed** (500–700, uppercase, +0.4–0.8
+letter-spacing) for labels, buttons and the big step name. Embedded by the expo-font plugin
+(`app.config.js` swaps the font plugin for the Floor build; files in `assets/fonts/barlow`, OFL).
+`fonts.condensed` in `theme.ts`.
+
+**Screens**
+- **Jobs (`FloorJobsScreen`)** — title "<name>'s jobs" (this phone's user) + date; 52 dp search
+  and new-job squares; a charcoal **My bench** bar (bench name in yellow) opens a bench picker
+  with counts; summary line (open · late · on hold); sections "At <bench>" then "Everything
+  else"; rows ≥ 78 dp: project name 19 pt, meta "CE · Production · Fabricating · 8/12 · due Fri",
+  "ON HOLD · reason" in red; 8 dp stage-colour left edge (red when late). "Show completed" at
+  the bottom.
+- **Order (`FloorOrderScreen`)** — stage-colour band: back square, CE · client, "PRODUCTION ·
+  STEP 2 OF 3", the step name in 54 pt condensed caps, project, due line with a white LATE chip;
+  red **ON HOLD** strip with a Resume button; four stage ticks (40 dp, current outlined, tap a
+  finished one to move back); Take photo + "<step> done"; production step chips (48 dp);
+  **Count pieces** (work ticket items with − count +, long-press to remove, Add item sheet);
+  photos for the current step/stage in a 3-column grid (All N shows the rest by stage);
+  **Dispatch & site** facts (sent by, waybill, store) from Dispatch on; sign-off list (newest
+  first); Client report / Office record; footer buttons Put on hold · Edit details ·
+  Production steps · Delete job.
+- **Sheets** slide up from the bottom: sign-off (team name chips, the client first for a sample
+  approval, a note, yellow Sign off), add item (qty − / +), hold reasons (one tap), dispatch
+  method chips + waybill + store, production steps (36 dp check boxes).
+- **Tab bar (`FloorTabBar`)** — flat, 72 dp: Jobs · Calendar · **Capture** (yellow, wider) ·
+  Insights · Settings; icon + condensed caps label; a 4 dp charcoal mark on the current tab.
+- Other screens (Calendar, Insights, Settings, New order, Edit details, camera) use the Floor
+  palette and Barlow through the shared tokens; their layouts are the Next ones for now.
+
+---
+
 ## 2. Color tokens — "Ink & ember"
 
 | Token | Hex | Used for |
@@ -408,6 +480,7 @@ The desktop app (`BPD_Capture_Desktop`, Electron + Vite + React) mirrors the mob
 
 | Date | Version | Change |
 |---|---|---|
+| 2026-10-21 | Floor (test build) | **BPD Capture Floor**: Floor Mode palette (concrete grey, charcoal, safety yellow; Night Shift dark), Barlow / Barlow Condensed, stage colours, Floor Jobs (My bench) and Order screens, 72 dp tab bar with a yellow Capture, glove-sized targets (48 / 56 / 64 dp). All builds: Settings → Workshop team (names, this phone's user, bench) replaces hard-coded sign-off names. Desktop: emoji replaced with line icons, team list in Settings. |
 | 2026-10-19 | Next (redesign) | **Work Ticket Checklist & Schema v6 (Mobile & Desktop)**: `order_items` table and migrations for physical work ticket items, sizes, materials, processes, and quantities. Interactive checklist card in `OrderScreen.tsx` (mobile) and `JobDetail.tsx` (desktop) with completion strike-through, step badges, inline item creation, and `−`/`+` batch quantity steppers. Added offline ML synthetic dataset generator and training pipeline for Donut document understanding. |
 | 2026-10-17 | Next (redesign) | **Stage history and sign-offs** (both mobile and desktop): schema v5 `stage_history` table, sign-off sheet/modal with operator quick pills (`Thabo`, `Sizwe`, `Lerato`, client) and notes, connected timeline displaying chronological approvals. **Desktop app redesign**: Ink & Ember palette, Outfit font, 4-stage workflow stepper, stage filter chips, cards with cover thumbnails, and stage history timeline. |
 | 2026-10-14 | Next (redesign) | Production split into steps (Machining → Fabricating → Finishing, chosen per order); stage 2 renamed **Dispatch** (was Packed). Step chips on the Order screen, step pills in the camera, step checkboxes on New order and in a Production steps sheet. |
