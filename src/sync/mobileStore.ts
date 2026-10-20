@@ -158,9 +158,12 @@ export function createMobileStore(): SyncStore {
           await renameOrderDirectory(local.ceNumber, ceNumber);
           await db.runAsync(`UPDATE media_items SET filePath = REPLACE(filePath, ?, ?) WHERE orderId = ?`, local.ceNumber, ceNumber, local.id);
         }
+        // Records from older app versions (or an older desktop) have no stage fields: keep what this phone has.
         await db.runAsync(
-          `UPDATE orders SET ceNumber = ?, status = ?, createdAt = ?, updatedAt = ?, completedAt = ?, dueDate = ?, notes = ?, clientName = ?, projectName = ?, stage = ?, productionSteps = ?, productionStep = ?, holdReason = ?, dispatchMethod = ?, waybill = ?, siteName = ?, syncedAt = ? WHERE id = ?`,
-          ceNumber, r.status, r.createdAt, r.updatedAt, r.completedAt, r.dueDate, r.notes, r.clientName, r.projectName, r.stage ?? (r.status === 'completed' ? 3 : 0), r.productionSteps ?? 'machining,fabricating,finishing', r.productionStep ?? 0, r.holdReason ?? null, r.dispatchMethod ?? null, r.waybill ?? null, r.siteName ?? null, r.updatedAt, local.id
+          `UPDATE orders SET ceNumber = ?, status = ?, createdAt = ?, updatedAt = ?, completedAt = ?, dueDate = ?, notes = ?, clientName = ?, projectName = ?,
+             stage = COALESCE(?, stage), productionSteps = COALESCE(?, productionSteps), productionStep = COALESCE(?, productionStep),
+             holdReason = ?, dispatchMethod = ?, waybill = ?, siteName = ?, syncedAt = ? WHERE id = ?`,
+          ceNumber, r.status, r.createdAt, r.updatedAt, r.completedAt, r.dueDate, r.notes, r.clientName, r.projectName, r.stage ?? null, r.productionSteps ?? null, r.productionStep ?? null, r.holdReason ?? null, r.dispatchMethod ?? null, r.waybill ?? null, r.siteName ?? null, r.updatedAt, local.id
         );
       } else {
         await db.runAsync(
@@ -202,7 +205,7 @@ export function createMobileStore(): SyncStore {
       if (!job) return;
       const existing = await db.getFirstAsync<{ id: number }>(`SELECT id FROM media_items WHERE uuid = ?`, r.uuid);
       if (existing) {
-        await db.runAsync(`UPDATE media_items SET fileName = ?, stage = ?, side = ?, step = ?, updatedAt = ?, syncedAt = ? WHERE id = ?`, r.fileName, r.stage ?? 0, r.side ?? null, r.step ?? null, r.updatedAt, r.updatedAt, existing.id);
+        await db.runAsync(`UPDATE media_items SET fileName = ?, stage = COALESCE(?, stage), side = ?, step = ?, updatedAt = ?, syncedAt = ? WHERE id = ?`, r.fileName, r.stage ?? null, r.side ?? null, r.step ?? null, r.updatedAt, r.updatedAt, existing.id);
         return;
       }
       if (base64 === null) return;
