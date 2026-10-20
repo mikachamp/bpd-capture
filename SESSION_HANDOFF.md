@@ -4,6 +4,54 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
+## TL;DR — current state (2026-10-21 overnight, "BPD Capture Floor" + test loops)
+
+The user went to sleep and said: build the style they liked (C Floor Mode), run multiple test
+loops on all versions and record data, and make Claude's own "best for the business" version as
+a separate APK with whatever features the business needs (free rein). Branch `floor` (from
+`redesign`), **not pushed** (repo is public and `ml/` may hold real client contacts, see below).
+
+**What was built (branch `floor`, commits dc7d8e7 … on top of d12316a)**
+- `APP_VARIANT=floor` -> "BPD Capture Floor", package `com.blueprintdigital.bpdcapture.floor`,
+  sync branch `data-floor`, update button disabled like Next. `app.config.js` swaps the font
+  plugin to Barlow / Barlow Condensed (`assets/fonts/barlow`, OFL).
+- `theme.ts`: `isFloor` (from the package name), Floor palette, `nightColors`, `stageColors`,
+  `fonts.condensed`, new `accentText` token (accent used as text; dark amber on Floor).
+- `FloorJobsScreen` (My bench first, stage-colour edges, hold reasons, piece counts) and
+  `FloorOrderScreen` (stage band, Take photo + "<step> done", count pieces, add item, hold,
+  dispatch & site, Night Shift auto on Installed), `FloorTabBar` (72 dp, yellow Capture).
+- All builds: Settings -> Workshop team (`TeamSettingsSection`, `db/team.ts`: staff list, this
+  phone's user, bench, Night Shift). Hard-coded Thabo/Sizwe/Lerato removed from sign-offs
+  (shared `utils/signOff.ts`). Status bar icons light on Ink & ember.
+- **Schema v7** (`FLOOR_MIGRATION_SQL`): uuid/updatedAt on `stage_history` and `order_items`
+  (items soft-deleted), `orders.holdReason`, `dispatchMethod`, `waybill`, `siteName`.
+- **Sync**: sign-offs and items ride inside each job record (`history`, `items`), merged per
+  record; `mergeJobChildren` on the store. Mobile and desktop `applyJob` keep local stage/steps
+  when an older record omits them (COALESCE). `npm run test:sync` 12/12 (3 new scenarios).
+- **Reports**: titled client packs (Sample approval / Progress report / Installation proof) and
+  Office record, sign-offs + work ticket tables, before/after groups, flat charcoal header (the
+  old cyan->purple gradient is gone). `utils/reportKind.ts`.
+
+**Desktop (`BPD_Capture_Desktop`)** now has a **local git repo** (branch `main`, not pushed):
+snapshot 9d8417a, then sync parity (bug fixed: the desktop store ignored stage/steps, so a desktop
+edit reset the phone's stage to Sample), schema v7, team list in Settings (IPC `settings:getStaff`
+/ `setStaff`), hold + dispatch card (`HoldDispatchCard.tsx`, IPC `orders:updateHold` /
+`updateLogistics`), emoji replaced by `components/Icon.tsx`. Scripts: `scripts/ui-loop.mjs`,
+`scripts/startup-loop.mjs`.
+
+**Testing** (`scripts/device-test/`: `loop.py`, `floor_flow.py`, `ui.py`, `summarize.py`; data in
+`builds/test-data/2026-10-21/`): see TEST_REPORT section below once written. Run 1 (8 rounds x 3
+builds) had 0 crashes / 0 ANRs, but the emulator's rendering degraded for every build from round
+4 on, so only rounds 1-3 compare fairly; the final run uses a cold-booted emulator in short
+batches.
+
+**Still open for the user**
+1. Are the names/emails/phones in `ml/dataset_generator.py` and `ml/dataset/metadata.jsonl`
+   real? If yes: replace and purge from history before anything else is pushed.
+2. Whether Floor should become the real app (would mean merging `floor` into master and a
+   versioned release with the private signing key).
+3. GitHub App Client ID for sync is still empty.
+
 ## TL;DR — current state (2026-10-20, review of another agent's work + new style exploration)
 
 **Another agent committed d12316a on `redesign` (pushed, 2026-10-19):** schema v5 `stage_history`
