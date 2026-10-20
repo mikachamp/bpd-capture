@@ -40,10 +40,21 @@ edit reset the phone's stage to Sample), schema v7, team list in Settings (IPC `
 `scripts/startup-loop.mjs`.
 
 **Testing** (`scripts/device-test/`: `loop.py`, `floor_flow.py`, `ui.py`, `summarize.py`; data in
-`builds/test-data/2026-10-21/`): see TEST_REPORT section below once written. Run 1 (8 rounds x 3
-builds) had 0 crashes / 0 ANRs, but the emulator's rendering degraded for every build from round
-4 on, so only rounds 1-3 compare fairly; the final run uses a cold-booted emulator in short
-batches.
+`builds/test-data/2026-10-21/`, report https://claude.ai/artifact/PGjVsUFNALEPA1Q523gKSv, copy in
+`builds/test-data/2026-10-21/bpd-overnight-report.html`). Run 1 (8 rounds x 3 builds) had 0
+crashes / 0 ANRs, but the emulator's rendering degraded for every build from round 4 on, so the
+**final** run used 3 cold-booted batches x 2 rounds, build order rotated:
+
+| Build | Cold start | Warm | Memory idle -> after monkey | Janky frames | Crashes/ANRs |
+|---|---|---|---|---|---|
+| Real 1.4.2 | 412 ms | 152 ms | 121 -> 178 MB | 29.5% (few frames drawn; not comparable) | 0/0 |
+| Next | 430 ms | 154 ms | 131 -> 232 MB | 9.0% | 0/0 |
+| Floor | 441 ms | 154 ms | 128 -> 170 MB | 13.7% | 0/0 |
+
+Floor walk-through (`floor_flow.py --fresh`): 48/48 steps over 4 runs. Desktop: 30 UI rounds,
+tabs ~62 ms, heap flat 9.5 MB, 0 errors; 10 cold starts, ready in ~2.1 s, ~386 MB. About 62k
+monkey events in total. Follow-ups: Next's memory after use is ~60 MB higher than Floor's
+(unexplained); Floor's frames are a bit jankier than Next's (profile FloorJobs/FloorOrder).
 
 **Still open for the user**
 1. Are the names/emails/phones in `ml/dataset_generator.py` and `ml/dataset/metadata.jsonl`
