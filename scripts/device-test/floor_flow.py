@@ -9,6 +9,7 @@ user would do it. Each step records pass/fail and a screenshot.
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import traceback
@@ -35,7 +36,8 @@ def main():
             ok, err = True, None
         except Exception as e:  # record and carry on
             ok, err = False, f'{e}\n{traceback.format_exc(limit=2)}'
-        png = f'flow{args.tag}-{len(steps) + 1:02d}-{name.lower().replace(" ", "-")[:40]}.png'
+        slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')[:40]
+        png = f'flow{args.tag}-{len(steps) + 1:02d}-{slug}.png'
         ui.shot(os.path.join(args.out, png))
         steps.append({'step': name, 'ok': ok, 'seconds': round(time.time() - started, 1), 'error': err, 'screenshot': png})
         print(('PASS ' if ok else 'FAIL ') + name, '' if ok else err.splitlines()[0], flush=True)
