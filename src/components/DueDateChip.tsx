@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   textAccent: {
-    color: colors.accent,
+    color: colors.accentText,
   },
   textWarning: {
     color: colors.warning,

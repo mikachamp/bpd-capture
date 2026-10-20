@@ -25,6 +25,8 @@ const inkAndEmber = {
   accentPressed: '#D2774E',
   accentTint: '#3A2618',
   accentInk: '#2B1206',
+  /** The accent when it is text (links, highlighted words) on the screen background. */
+  accentText: '#E98B60',
 
   /** Selected state for tabs, chips and segments (a tint, never white). */
   selected: '#26344B',
@@ -61,6 +63,8 @@ const floorDay: Palette = {
   accentPressed: '#DDAE1F',
   accentTint: '#F5E3A8',
   accentInk: '#202326',
+  /** Yellow text is unreadable on concrete grey: dark amber instead. */
+  accentText: '#7A5600',
 
   selected: '#202326',
   selectedText: '#F1F2EE',
@@ -88,6 +92,7 @@ export const nightColors: Palette = {
   textPrimary: '#F1F2EE',
   textSecondary: '#D2D5D8',
   textMuted: '#A2A7AD',
+  accentText: '#F2C12E',
   selected: '#F1F2EE',
   selectedText: '#15171A',
   success: '#5FBF8A',

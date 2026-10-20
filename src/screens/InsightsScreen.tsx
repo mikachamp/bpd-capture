@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   backLink: {
-    color: colors.accent,
+    color: colors.accentText,
     fontFamily: fonts.family,
     fontSize: 18,
     fontWeight: '700',

@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: colors.textPrimary, fontWeight: '700', fontFamily: fonts.family, fontSize: 15 },
   codeBox: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   code: { color: colors.textPrimary, fontSize: 30, fontWeight: '700', letterSpacing: 4, textAlign: 'center', paddingVertical: spacing.sm },
-  link: { color: colors.accent, fontSize: 14, fontWeight: '600', textAlign: 'center' },
+  link: { color: colors.accentText, fontSize: 14, fontWeight: '600', textAlign: 'center' },
   waitRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   quietLink: { color: colors.textSecondary, fontSize: 13, textDecorationLine: 'underline', textAlign: 'center', marginTop: spacing.md },
   message: { color: colors.textPrimary },

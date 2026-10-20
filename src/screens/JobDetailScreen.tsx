@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerSaveText: {
-    color: colors.accent,
+    color: colors.accentText,
     fontWeight: '700',
     fontFamily: fonts.family,
     fontSize: 16,

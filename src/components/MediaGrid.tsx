@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   },
   actionRowText: {
     ...typography.subtitle,
-    color: colors.accent,
+    color: colors.accentText,
   },
   actionRowDanger: {
     color: colors.danger,

@@ -56,6 +56,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
   client: { fontFamily: fonts.family, fontSize: 12.5, color: colors.textMuted },
   project: { fontFamily: fonts.family, fontSize: 17, color: colors.textPrimary, marginTop: 2 },
-  stage: { fontFamily: fonts.family, fontSize: 13, color: colors.accent, borderRadius: radius.pill },
+  stage: { fontFamily: fonts.family, fontSize: 13, color: colors.accentText, borderRadius: radius.pill },
   empty: { fontFamily: fonts.family, fontSize: 14, color: colors.textMuted, marginTop: spacing.xl },
 });

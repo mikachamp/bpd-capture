@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   headerSaveText: {
-    color: colors.accent,
+    color: colors.accentText,
     fontWeight: '700',
     fontFamily: fonts.family,
     fontSize: 16,

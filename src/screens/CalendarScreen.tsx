@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   backLink: {
-    color: colors.accent,
+    color: colors.accentText,
     fontFamily: fonts.family,
     fontSize: 18,
     fontWeight: '700',
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   navArrow: {
     fontFamily: fonts.family,
     fontSize: 26,
-    color: colors.accent,
+    color: colors.accentText,
     fontWeight: '600',
     paddingHorizontal: spacing.sm,
   },
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   todayTagText: {
-    color: colors.accent,
+    color: colors.accentText,
     fontFamily: fonts.family,
     fontSize: 11,
     fontWeight: '700',

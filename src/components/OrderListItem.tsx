@@ -182,13 +182,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   viewMoreText: {
-    color: colors.accent,
+    color: colors.accentText,
     fontWeight: '700',
     fontFamily: fonts.family,
     fontSize: 13,
   },
   viewMoreChevron: {
-    color: colors.accent,
+    color: colors.accentText,
     fontWeight: '700',
     fontFamily: fonts.family,
     fontSize: 16,

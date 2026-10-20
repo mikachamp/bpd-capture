@@ -237,7 +237,7 @@ export function OrderScreen({ route, navigation }: Props) {
         <View style={styles.historySection}>
           <View style={styles.sectionHead}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-              <Icon name="check" size={16} color={colors.accent} strokeWidth={2.4} />
+              <Icon name="check" size={16} color={colors.accentText} strokeWidth={2.4} />
               <Text style={styles.sectionTitle}>Stage History & Sign-Offs</Text>
             </View>
             <Text style={styles.sectionMeta}>{history.length} sign-off{history.length === 1 ? '' : 's'}</Text>
@@ -281,7 +281,7 @@ export function OrderScreen({ route, navigation }: Props) {
         <View style={styles.checklistSection}>
           <View style={styles.sectionHead}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-              <Icon name="list" size={16} color={colors.accent} strokeWidth={2.4} />
+              <Icon name="list" size={16} color={colors.accentText} strokeWidth={2.4} />
               <Text style={styles.sectionTitle}>Work Ticket Checklist</Text>
             </View>
             <Text style={styles.sectionMeta}>
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
   itemTitle: { fontFamily: fonts.family, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   itemTitleDone: { textDecorationLine: 'line-through', color: colors.textSecondary },
   stepBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: colors.surface },
-  stepBadgeText: { fontFamily: fonts.family, fontSize: 10.5, color: colors.accent, fontWeight: '500' },
+  stepBadgeText: { fontFamily: fonts.family, fontSize: 10.5, color: colors.accentText, fontWeight: '500' },
   itemMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   itemSizeBadge: { fontFamily: fonts.family, fontSize: 11, color: colors.textMuted, backgroundColor: colors.surface, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
   itemMaterial: { fontFamily: fonts.family, fontSize: 11.5, color: colors.textSecondary },

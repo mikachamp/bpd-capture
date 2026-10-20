@@ -203,11 +203,11 @@ export function SettingsScreen({ navigation }: Props) {
   }, [navigation, email, justSaved]);
 
   if (!loaded) {
-    return <SafeAreaView style={styles.container} />;
+    return <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']} />;
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.content}>
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   headerSaveText: {
-    color: colors.accent,
+    color: colors.accentText,
     fontWeight: '700',
     fontFamily: fonts.family,
     fontSize: 16,

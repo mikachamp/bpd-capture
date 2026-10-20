@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   navArrow: {
     fontFamily: fonts.family,
     fontSize: 24,
-    color: colors.accent,
+    color: colors.accentText,
     fontWeight: '600',
     paddingHorizontal: spacing.sm,
   },
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   dayTextToday: {
-    color: colors.accent,
+    color: colors.accentText,
   },
   dot: {
     position: 'absolute',

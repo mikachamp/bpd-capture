@@ -75,6 +75,7 @@ have Floor-only layouts (`FloorJobsScreen.tsx`, `FloorOrderScreen.tsx`, `FloorTa
 | `textMuted` | `#5A5F64` | `#A2A7AD` | Labels, meta |
 | `accent` | `#F2C12E` safety yellow | same | The one "do this now" action |
 | `accentInk` | `#202326` | same | Text on yellow |
+| `accentText` | `#7A5600` dark amber | `#F2C12E` | The accent used as text or an icon (links, highlights); yellow text is unreadable on grey. Ink & ember: `#E98B60` |
 | `danger` | `#B83A22` | `#F06A4E` | Late, on hold, delete |
 | `success` | `#2E7D4F` | `#5FBF8A` | Item fully counted |
 
