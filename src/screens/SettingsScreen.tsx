@@ -16,6 +16,7 @@ import {
 } from '../services/appUpdate';
 import { colors, fonts, radius, spacing, typography } from '../theme/theme';
 import { SyncSettingsSection } from '../components/SyncSettingsSection';
+import { TeamSettingsSection } from '../components/TeamSettingsSection';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'SettingsTab'>,
@@ -210,7 +211,9 @@ export function SettingsScreen({ navigation }: Props) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.content}>
-            <Text style={styles.sectionLabel}>Clients</Text>
+            <TeamSettingsSection />
+
+            <Text style={[styles.sectionLabel, styles.sectionSpacing]}>Clients</Text>
             <Text style={styles.helperText}>
               Manage the client names suggested when creating a new job.
             </Text>
@@ -247,9 +250,9 @@ export function SettingsScreen({ navigation }: Props) {
 
             <Text style={[styles.sectionLabel, styles.sectionSpacing]}>Data Backup</Text>
             <Text style={styles.helperText}>
-              Everything lives only on this device — there's no cloud sync. Create a backup
-              file periodically and save it somewhere safe (Drive, a computer) in case this
-              phone is lost, reset, or the app is uninstalled.
+              A backup file is a full copy of this phone's jobs, photos and videos. Make one now
+              and then and keep it somewhere safe (Drive, a computer) in case this phone is
+              lost or reset. Updates make their own backup automatically.
             </Text>
 
             <Pressable

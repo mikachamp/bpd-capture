@@ -1,4 +1,4 @@
-import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RootStackParamList, MainTabParamList } from './types';
 import { JobsScreen } from '../screens/JobsScreen';
 import { OrderScreen } from '../screens/OrderScreen';
+import { FloorJobsScreen } from '../screens/FloorJobsScreen';
+import { FloorOrderScreen } from '../screens/FloorOrderScreen';
 import { PickJobScreen } from '../screens/PickJobScreen';
 import { NewOrderScreen } from '../screens/NewOrderScreen';
 import { JobDetailScreen } from '../screens/JobDetailScreen';
@@ -18,15 +20,16 @@ import { CalendarScreen } from '../screens/CalendarScreen';
 import { InsightsScreen } from '../screens/InsightsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { Icon, type IconName } from '../components/Icon';
-import { colors, fonts, radius, spacing } from '../theme/theme';
+import { colors, fonts, isFloor, radius, spacing } from '../theme/theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
+const baseTheme = isFloor ? DefaultTheme : DarkTheme;
 const navigationTheme: Theme = {
-  ...DarkTheme,
+  ...baseTheme,
   colors: {
-    ...DarkTheme.colors,
+    ...baseTheme.colors,
     background: colors.background,
     card: colors.background,
     text: colors.textPrimary,
@@ -78,10 +81,52 @@ function PillTabBar({ state, navigation }: BottomTabBarProps) {
   );
 }
 
+/**
+ * Floor Mode bar: flat, 72 dp tall, icon + label on every tab, and a wide
+ * safety-yellow Capture in the middle where a thumb lands.
+ */
+function FloorTabBar({ state, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const tab = (index: number) => {
+    const route = state.routes[index];
+    const focused = state.index === index;
+    const meta = TAB_ICONS[route.name as keyof MainTabParamList];
+    return (
+      <Pressable
+        key={route.key}
+        style={styles.floorTab}
+        onPress={() => {
+          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+        }}
+        accessibilityRole="tab"
+        accessibilityState={{ selected: focused }}
+        accessibilityLabel={meta.label}
+      >
+        <Icon name={meta.icon} size={26} color={focused ? colors.textPrimary : colors.textMuted} strokeWidth={focused ? 2.2 : 1.8} />
+        <Text style={[styles.floorTabText, focused && styles.floorTabTextOn]}>{meta.label}</Text>
+        {focused && <View style={styles.floorTabMark} />}
+      </Pressable>
+    );
+  };
+  return (
+    <View style={[styles.floorBar, { paddingBottom: insets.bottom }]}>
+      {tab(0)}
+      {tab(1)}
+      <Pressable style={styles.floorCapture} onPress={() => navigation.getParent()?.navigate('PickJob')} accessibilityLabel="Capture photos for a job">
+        <Icon name="camera" size={28} color={colors.accentInk} strokeWidth={2.2} />
+        <Text style={styles.floorCaptureText}>Capture</Text>
+      </Pressable>
+      {tab(2)}
+      {tab(3)}
+    </View>
+  );
+}
+
 function MainTabNavigator() {
   return (
-    <Tab.Navigator tabBar={(props) => <PillTabBar {...props} />} screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="DashboardTab" component={JobsScreen} options={{ title: 'Jobs' }} />
+    <Tab.Navigator tabBar={(props) => (isFloor ? <FloorTabBar {...props} /> : <PillTabBar {...props} />)} screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="DashboardTab" component={isFloor ? FloorJobsScreen : JobsScreen} options={{ title: 'Jobs' }} />
       <Tab.Screen name="CalendarTab" component={CalendarScreen} options={{ title: 'Calendar' }} />
       <Tab.Screen name="InsightsTab" component={InsightsScreen} options={{ title: 'Insights' }} />
       <Tab.Screen
@@ -113,7 +158,7 @@ export function RootNavigator() {
         }}
       >
         <Stack.Screen name="MainTabs" component={MainTabNavigator} options={{ headerShown: false }} />
-        <Stack.Screen name="Order" component={OrderScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Order" component={isFloor ? FloorOrderScreen : OrderScreen} options={{ headerShown: false }} />
         <Stack.Screen name="PickJob" component={PickJobScreen} options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="NewOrder" component={NewOrderScreen} options={{ title: 'New order' }} />
         <Stack.Screen name="JobDetail" component={JobDetailScreen} options={{ title: 'Edit details' }} />
@@ -138,4 +183,11 @@ const styles = StyleSheet.create({
   tabOn: { backgroundColor: colors.selected },
   capture: { height: 48, paddingLeft: 14, paddingRight: 18, borderRadius: radius.pill, backgroundColor: colors.accent, flexDirection: 'row', alignItems: 'center', gap: 6 },
   captureText: { fontFamily: fonts.family, fontSize: 15, fontWeight: '500', color: colors.accentInk },
+  floorBar: { flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
+  floorTab: { flex: 1, height: 72, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  floorTabText: { fontFamily: fonts.condensed, textTransform: 'uppercase', fontSize: 13, fontWeight: '600', letterSpacing: 0.5, color: colors.textMuted },
+  floorTabTextOn: { color: colors.textPrimary, fontWeight: '700' },
+  floorTabMark: { position: 'absolute', top: 0, left: 14, right: 14, height: 4, backgroundColor: colors.textPrimary },
+  floorCapture: { flex: 1.3, height: 72, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  floorCaptureText: { fontFamily: fonts.condensed, textTransform: 'uppercase', fontSize: 15, fontWeight: '700', letterSpacing: 0.5, color: colors.accentInk },
 });

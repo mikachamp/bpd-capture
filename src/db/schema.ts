@@ -96,7 +96,7 @@ export const MIGRATIONS_SQL: string[] = [
  * - sync_remote_index: GitHub's file list as of the last sync, to tell
  *   "deleted on the other device" apart from "never synced".
  */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export const SYNC_MIGRATION_SQL: string[] = [
   `ALTER TABLE orders ADD COLUMN uuid TEXT`,
@@ -187,3 +187,31 @@ export const ORDER_ITEMS_MIGRATION_SQL: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_order_items_orderId ON order_items(orderId)`,
 ];
 
+
+/**
+ * Schema version 7 — Floor Mode features and syncing the v5/v6 tables.
+ * - stage_history and order_items get a uuid + updatedAt so they travel inside
+ *   each job's sync record; order_items are soft-deleted (deleted = 1) so a
+ *   delete on one device reaches the other.
+ * - orders.holdReason: why a job is stuck (waiting for parts, client, ...); null = not on hold.
+ * - orders.dispatchMethod / waybill: how it left the workshop (courier, own
+ *   installer, collection) and the tracking or waybill number.
+ * - orders.siteName: the store or site it is installed at.
+ */
+export const FLOOR_MIGRATION_SQL: string[] = [
+  `ALTER TABLE stage_history ADD COLUMN uuid TEXT`,
+  `ALTER TABLE stage_history ADD COLUMN updatedAt TEXT`,
+  `ALTER TABLE order_items ADD COLUMN uuid TEXT`,
+  `ALTER TABLE order_items ADD COLUMN updatedAt TEXT`,
+  `ALTER TABLE order_items ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0`,
+  `UPDATE stage_history SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL`,
+  `UPDATE stage_history SET updatedAt = createdAt WHERE updatedAt IS NULL`,
+  `UPDATE order_items SET uuid = lower(hex(randomblob(16))) WHERE uuid IS NULL`,
+  `UPDATE order_items SET updatedAt = createdAt WHERE updatedAt IS NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_stage_history_uuid ON stage_history(uuid)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_order_items_uuid ON order_items(uuid)`,
+  `ALTER TABLE orders ADD COLUMN holdReason TEXT`,
+  `ALTER TABLE orders ADD COLUMN dispatchMethod TEXT`,
+  `ALTER TABLE orders ADD COLUMN waybill TEXT`,
+  `ALTER TABLE orders ADD COLUMN siteName TEXT`,
+];

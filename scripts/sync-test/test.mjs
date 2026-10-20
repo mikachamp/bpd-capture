@@ -35,6 +35,17 @@ class Device {
   editJob(uuid, patch) { Object.assign(this.jobs.get(uuid), patch, { updatedAt: now() }); }
   deleteJob(uuid) { this.jobs.delete(uuid); for (const [k, m] of this.media) if (m.jobUuid === uuid) this.media.delete(k); if (!uuid.startsWith('demo-')) this.tombs.add(`jobs/${uuid}.json`).add(`media/${uuid}/`); }
   addPhoto(jobUuid, bytes) { const uuid = `${this.name}-m-${++clock}`; const t = now(); this.media.set(uuid, { uuid, jobUuid, type: 'photo', fileName: `photo_${clock}.jpg`, extension: 'jpg', createdAt: t, updatedAt: t, syncedAt: null }); this.files.set(uuid, bytes); return uuid; }
+  signOff(uuid, action) { const j = this.jobs.get(uuid); const t = now(); (j.history ??= []).push({ uuid: `${this.name}-h-${clock}`, stage: 1, step: null, action, actor: this.name, notes: null, createdAt: t, updatedAt: t }); j.updatedAt = now(); }
+  addItem(uuid, description, quantity) { const j = this.jobs.get(uuid); const t = now(); const it = { uuid: `${this.name}-i-${clock}`, description, size: null, material: null, process: null, quantity, completedQty: 0, step: null, isCompleted: false, wtNumber: null, createdAt: t, updatedAt: t, deleted: false }; (j.items ??= []).push(it); j.updatedAt = now(); return it.uuid; }
+  editItem(uuid, itemUuid, patch) { const j = this.jobs.get(uuid); Object.assign(j.items.find((i) => i.uuid === itemUuid), patch, { updatedAt: now() }); j.updatedAt = now(); }
+  item(uuid, itemUuid) { return (this.jobs.get(uuid).items ?? []).find((i) => i.uuid === itemUuid); }
+  mergeChildren(local, r) {
+    local.history ??= []; local.items ??= [];
+    for (const h of r.history ?? []) if (!local.history.some((x) => x.uuid === h.uuid)) local.history.push({ ...h });
+    for (const it of r.items ?? []) { const mine = local.items.find((x) => x.uuid === it.uuid); if (!mine) local.items.push({ ...it }); else if (it.updatedAt > mine.updatedAt) Object.assign(mine, it); }
+    const rh = new Set((r.history ?? []).map((h) => h.uuid)); const ri = new Map((r.items ?? []).map((i) => [i.uuid, i.updatedAt]));
+    return local.history.some((h) => !rh.has(h.uuid)) || local.items.some((i) => !ri.has(i.uuid) || i.updatedAt > ri.get(i.uuid));
+  }
   // SyncStore
   strip(r) { const { syncedAt, ...rest } = r; return rest; }
   dirty(map) { return [...map.values()].filter((r) => !r.syncedAt || r.syncedAt < r.updatedAt).map((r) => this.strip(r)); }
@@ -47,7 +58,15 @@ class Device {
   async jobStamp(u) { return this.stamp(this.jobs.get(u)); }
   async clientStamp(u) { return this.stamp(this.clients.get(u)); }
   async mediaStamp(u) { return this.stamp(this.media.get(u)); }
-  async applyJob(r) { const isNew = !this.jobs.has(r.uuid); this.jobs.set(r.uuid, { ...r, syncedAt: r.updatedAt }); return isNew; }
+  async applyJob(r) {
+    const old = this.jobs.get(r.uuid); const isNew = !old;
+    const { history, items, ...fields } = r;
+    const job = { ...fields, history: old?.history ?? [], items: old?.items ?? [], syncedAt: r.updatedAt };
+    this.jobs.set(r.uuid, job);
+    if (this.mergeChildren(job, r)) job.updatedAt = now();
+    return isNew;
+  }
+  async mergeJobChildren(r) { const job = this.jobs.get(r.uuid); if (job) this.mergeChildren(job, r); }
   async applyClient(r) { this.clients.set(r.uuid, { ...r, syncedAt: r.updatedAt }); }
   async applyMedia(r, b64) { if (!this.jobs.has(r.jobUuid)) return; this.media.set(r.uuid, { ...r, syncedAt: r.updatedAt }); if (b64 !== null) this.files.set(r.uuid, base64ToUtf8(b64)); }
   async deleteJobLocal(u) { this.jobs.delete(u); for (const [k, m] of this.media) if (m.jobUuid === u) this.media.delete(k); }
@@ -143,6 +162,36 @@ await step('deleted on one device but edited on the other: the edit is kept', as
 await step('deleting a demo job leaves nothing to sync', async () => {
   phone.deleteJob('demo-CE-DEMO');
   assert.equal(phone.tombs.size, 0);
+});
+
+await step('both sign off the same job offline: both sign-offs end up on both devices', async () => {
+  const uuid = [...phone.jobs.values()].find((j) => j.ceNumber === 'CE-300').uuid;
+  phone.signOff(uuid, 'Machining completed');
+  desk.signOff(uuid, 'QC checked');
+  await sync(phone); await sync(desk); await sync(phone);
+  const actions = (d) => d.jobs.get(uuid).history.map((h) => h.action).sort();
+  assert.deepEqual(actions(phone), ['Machining completed', 'QC checked']);
+  assert.deepEqual(actions(desk), ['Machining completed', 'QC checked']);
+});
+
+await step('piece count on the phone survives a newer job edit on the desktop', async () => {
+  const uuid = [...phone.jobs.values()].find((j) => j.ceNumber === 'CE-300').uuid;
+  const item = phone.addItem(uuid, 'Plinth body', 12);
+  await sync(phone); await sync(desk);
+  phone.editItem(uuid, item, { completedQty: 8 });
+  desk.editJob(uuid, { notes: 'desk note (newer)' });
+  await sync(phone); await sync(desk); await sync(phone);
+  assert.equal(desk.item(uuid, item).completedQty, 8);
+  assert.equal(phone.item(uuid, item).completedQty, 8);
+  assert.equal(phone.jobs.get(uuid).notes, 'desk note (newer)');
+});
+
+await step('deleting a ticket item on the desktop removes it on the phone', async () => {
+  const uuid = [...desk.jobs.values()].find((j) => j.ceNumber === 'CE-300').uuid;
+  const item = desk.jobs.get(uuid).items[0].uuid;
+  desk.editItem(uuid, item, { deleted: true });
+  await sync(desk); await sync(phone);
+  assert.equal(phone.item(uuid, item).deleted, true);
 });
 
 console.log(`\n${passed} scenarios passed. GitHub files now:\n  ${gh.files().join('\n  ')}`);

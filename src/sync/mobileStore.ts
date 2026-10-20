@@ -4,7 +4,7 @@ import { getDb } from '../db/client';
 import { getSetting, setSetting } from '../db/settings';
 import { deleteMediaFile, deleteOrderDirectory, renameOrderDirectory, writeSyncedMediaFile } from '../services/storage';
 import { DEMO_UUID_PREFIX } from './paths';
-import type { ClientRecord, JobRecord, LocalStamp, MediaRecord, SyncStore } from './syncCore';
+import type { ClientRecord, HistoryRecord, ItemRecord, JobRecord, LocalStamp, MediaRecord, SyncStore } from './syncCore';
 
 /** GitHub rejects files over 100 MB; base64 is 4/3 of the size. Stay under with room to spare. */
 const MAX_UPLOAD_BASE64 = Math.floor(95 * 1024 * 1024 * (4 / 3));
@@ -15,6 +15,60 @@ const withExtension = (name: string, ext: string) => name.replace(/\.[a-z0-9]+$/
 
 /** Media that sync skipped (too large even after compression), shown in Settings. */
 export const skippedUploads: string[] = [];
+
+type ItemRow = Omit<ItemRecord, 'isCompleted' | 'deleted'> & { isCompleted: number; deleted: number };
+
+/** A job's sign-offs and work ticket items, as they go into its sync record. */
+async function jobChildren(orderId: number): Promise<{ history: HistoryRecord[]; items: ItemRecord[] }> {
+  const db = await getDb();
+  const history = await db.getAllAsync<HistoryRecord>(
+    `SELECT uuid, stage, step, action, actor, notes, createdAt, updatedAt FROM stage_history WHERE orderId = ? ORDER BY createdAt ASC, id ASC`,
+    orderId
+  );
+  const rows = await db.getAllAsync<ItemRow>(
+    `SELECT uuid, description, size, material, process, quantity, completedQty, step, isCompleted, wtNumber, createdAt, updatedAt, deleted FROM order_items WHERE orderId = ? ORDER BY id ASC`,
+    orderId
+  );
+  return { history, items: rows.map((r) => ({ ...r, isCompleted: !!r.isCompleted, deleted: !!r.deleted })) };
+}
+
+/**
+ * Merges another device's sign-offs and items into a local job, record by
+ * record. Returns true when this device has something the other one hasn't
+ * (so the job still needs uploading after taking GitHub's version).
+ */
+async function mergeChildren(orderId: number, record: JobRecord): Promise<boolean> {
+  const db = await getDb();
+  const remoteHistory = record.history ?? [];
+  const remoteItems = record.items ?? [];
+  for (const h of remoteHistory) {
+    await db.runAsync(
+      `INSERT OR IGNORE INTO stage_history (uuid, orderId, stage, step, action, actor, notes, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      h.uuid, orderId, h.stage, h.step, h.action, h.actor, h.notes, h.createdAt, h.updatedAt
+    );
+  }
+  for (const it of remoteItems) {
+    const local = await db.getFirstAsync<{ id: number; updatedAt: string }>(`SELECT id, updatedAt FROM order_items WHERE uuid = ?`, it.uuid);
+    if (!local) {
+      await db.runAsync(
+        `INSERT INTO order_items (uuid, orderId, description, size, material, process, quantity, completedQty, step, isCompleted, wtNumber, createdAt, updatedAt, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        it.uuid, orderId, it.description, it.size, it.material, it.process, it.quantity, it.completedQty, it.step, it.isCompleted ? 1 : 0, it.wtNumber, it.createdAt, it.updatedAt, it.deleted ? 1 : 0
+      );
+    } else if (it.updatedAt > local.updatedAt) {
+      await db.runAsync(
+        `UPDATE order_items SET description = ?, size = ?, material = ?, process = ?, quantity = ?, completedQty = ?, step = ?, isCompleted = ?, wtNumber = ?, updatedAt = ?, deleted = ? WHERE id = ?`,
+        it.description, it.size, it.material, it.process, it.quantity, it.completedQty, it.step, it.isCompleted ? 1 : 0, it.wtNumber, it.updatedAt, it.deleted ? 1 : 0, local.id
+      );
+    }
+  }
+  const mine = await jobChildren(orderId);
+  const remoteHistoryIds = new Set(remoteHistory.map((h) => h.uuid));
+  const remoteItemStamps = new Map(remoteItems.map((i) => [i.uuid, i.updatedAt]));
+  return (
+    mine.history.some((h) => !remoteHistoryIds.has(h.uuid)) ||
+    mine.items.some((i) => !remoteItemStamps.has(i.uuid) || i.updatedAt > (remoteItemStamps.get(i.uuid) as string))
+  );
+}
 
 /**
  * The phone's side of sync: reads and writes the SQLite tables and the job
@@ -30,10 +84,13 @@ export function createMobileStore(): SyncStore {
   return {
     async dirtyJobs() {
       const db = await getDb();
-      return db.getAllAsync<JobRecord>(
-        `SELECT uuid, ceNumber, status, createdAt, updatedAt, completedAt, dueDate, notes, clientName, projectName, stage, productionSteps, productionStep
+      const rows = await db.getAllAsync<JobRecord & { id: number }>(
+        `SELECT id, uuid, ceNumber, status, createdAt, updatedAt, completedAt, dueDate, notes, clientName, projectName, stage, productionSteps, productionStep, holdReason, dispatchMethod, waybill, siteName
          FROM orders WHERE uuid NOT LIKE 'demo-%' AND (syncedAt IS NULL OR syncedAt < updatedAt)`
       );
+      const records: JobRecord[] = [];
+      for (const { id, ...job } of rows) records.push({ ...job, ...(await jobChildren(id)) });
+      return records;
     },
     async dirtyClients() {
       const db = await getDb();
@@ -102,16 +159,27 @@ export function createMobileStore(): SyncStore {
           await db.runAsync(`UPDATE media_items SET filePath = REPLACE(filePath, ?, ?) WHERE orderId = ?`, local.ceNumber, ceNumber, local.id);
         }
         await db.runAsync(
-          `UPDATE orders SET ceNumber = ?, status = ?, createdAt = ?, updatedAt = ?, completedAt = ?, dueDate = ?, notes = ?, clientName = ?, projectName = ?, stage = ?, productionSteps = ?, productionStep = ?, syncedAt = ? WHERE id = ?`,
-          ceNumber, r.status, r.createdAt, r.updatedAt, r.completedAt, r.dueDate, r.notes, r.clientName, r.projectName, r.stage ?? (r.status === 'completed' ? 3 : 0), r.productionSteps ?? 'machining,fabricating,finishing', r.productionStep ?? 0, r.updatedAt, local.id
+          `UPDATE orders SET ceNumber = ?, status = ?, createdAt = ?, updatedAt = ?, completedAt = ?, dueDate = ?, notes = ?, clientName = ?, projectName = ?, stage = ?, productionSteps = ?, productionStep = ?, holdReason = ?, dispatchMethod = ?, waybill = ?, siteName = ?, syncedAt = ? WHERE id = ?`,
+          ceNumber, r.status, r.createdAt, r.updatedAt, r.completedAt, r.dueDate, r.notes, r.clientName, r.projectName, r.stage ?? (r.status === 'completed' ? 3 : 0), r.productionSteps ?? 'machining,fabricating,finishing', r.productionStep ?? 0, r.holdReason ?? null, r.dispatchMethod ?? null, r.waybill ?? null, r.siteName ?? null, r.updatedAt, local.id
         );
       } else {
         await db.runAsync(
-          `INSERT INTO orders (uuid, ceNumber, status, createdAt, updatedAt, completedAt, dueDate, notes, clientName, projectName, stage, productionSteps, productionStep, syncedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          r.uuid, ceNumber, r.status, r.createdAt, r.updatedAt, r.completedAt, r.dueDate, r.notes, r.clientName, r.projectName, r.stage ?? (r.status === 'completed' ? 3 : 0), r.productionSteps ?? 'machining,fabricating,finishing', r.productionStep ?? 0, r.updatedAt
+          `INSERT INTO orders (uuid, ceNumber, status, createdAt, updatedAt, completedAt, dueDate, notes, clientName, projectName, stage, productionSteps, productionStep, holdReason, dispatchMethod, waybill, siteName, syncedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          r.uuid, ceNumber, r.status, r.createdAt, r.updatedAt, r.completedAt, r.dueDate, r.notes, r.clientName, r.projectName, r.stage ?? (r.status === 'completed' ? 3 : 0), r.productionSteps ?? 'machining,fabricating,finishing', r.productionStep ?? 0, r.holdReason ?? null, r.dispatchMethod ?? null, r.waybill ?? null, r.siteName ?? null, r.updatedAt
         );
       }
+      const row = await db.getFirstAsync<{ id: number }>(`SELECT id FROM orders WHERE uuid = ?`, r.uuid);
+      if (row && (await mergeChildren(row.id, r))) {
+        // We hold sign-offs/items GitHub doesn't have yet: stay dirty so this sync uploads them.
+        await db.runAsync(`UPDATE orders SET updatedAt = ? WHERE id = ?`, new Date().toISOString(), row.id);
+      }
       return isNew;
+    },
+
+    async mergeJobChildren(r) {
+      const db = await getDb();
+      const row = await db.getFirstAsync<{ id: number }>(`SELECT id FROM orders WHERE uuid = ?`, r.uuid);
+      if (row) await mergeChildren(row.id, r);
     },
 
     async applyClient(r) {

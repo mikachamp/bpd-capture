@@ -5,7 +5,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import type { RootStackParamList } from '../navigation/types';
-import { addStageEvent, deleteOrder, getOrderById, listOrderItemsForOrder, listStageEventsForOrder, toggleOrderItemCompleted, updateOrderItemCompletedQty, updateOrderProductionStep, updateOrderProductionSteps, updateOrderStage } from '../db/orders';
+import { deleteOrder, getOrderById, listOrderItemsForOrder, listStageEventsForOrder, toggleOrderItemCompleted, updateOrderItemCompletedQty, updateOrderProductionStep, updateOrderProductionSteps, updateOrderStage } from '../db/orders';
+import { getOperator, getStaff } from '../db/team';
+import { applySignOff, clientActor, signOffFor, type SignOffPrompt } from '../utils/signOff';
 import { deleteMediaItem, listMediaForOrder } from '../db/mediaItems';
 import { deleteMediaFile, deleteOrderDirectory } from '../services/storage';
 import { exportAndShareJobReport } from '../services/reportPdf';
@@ -44,32 +46,24 @@ export function OrderScreen({ route, navigation }: Props) {
   const [exporting, setExporting] = useState<'client' | 'internal' | null>(null);
   const [editingSteps, setEditingSteps] = useState<ProductionStepKey[] | null>(null);
 
-  type SignOffPrompt = {
-    title: string;
-    subtitle: string;
-    action: string;
-    stage: Stage;
-    step: string | null;
-    defaultActor: string;
-    defaultNotes: string;
-    isReopen?: boolean;
-    isProductionStepAdvance?: boolean;
-    nextStepIndex?: number;
-    nextStage?: Stage;
-    isComplete?: boolean;
-  };
   const [signOffPrompt, setSignOffPrompt] = useState<SignOffPrompt | null>(null);
   const [signOffActor, setSignOffActor] = useState('');
   const [signOffNotes, setSignOffNotes] = useState('');
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [staff, setStaffList] = useState<string[]>([]);
+  const [operator, setOperatorName] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    const [fresh, items, events, ticketItems] = await Promise.all([
+    const [fresh, items, events, ticketItems, team, me] = await Promise.all([
       getOrderById(orderId),
       listMediaForOrder(orderId),
       listStageEventsForOrder(orderId),
       listOrderItemsForOrder(orderId),
+      getStaff(),
+      getOperator(),
     ]);
+    setStaffList(team);
+    setOperatorName(me);
     setOrder(fresh);
     setMedia(items);
     setHistory(events);
@@ -98,135 +92,15 @@ export function OrderScreen({ route, navigation }: Props) {
   const stepIndex = Math.min(order.productionStep ?? 0, Math.max(steps.length - 1, 0));
 
   const openSignOffAdvance = () => {
-    if (completed) {
-      setSignOffActor('Thabo');
-      setSignOffNotes('Reopened for inspection/adjustments');
-      setSignOffPrompt({
-        title: 'Reopen Order',
-        subtitle: 'Move order back to in-process at Installed stage.',
-        action: 'Reopened order',
-        stage: 3,
-        step: null,
-        defaultActor: 'Thabo',
-        defaultNotes: 'Reopened for inspection/adjustments',
-        isReopen: true,
-      });
-      return;
-    }
-    if (stage === 0) {
-      const actor = order.clientName ? `${order.clientName} (Client)` : 'Client';
-      const notes = 'Sample approved for full production';
-      setSignOffActor(actor);
-      setSignOffNotes(notes);
-      setSignOffPrompt({
-        title: 'Client Sample Approval',
-        subtitle: 'Record client approval before starting Production.',
-        action: 'Sample approved',
-        stage: 0,
-        step: null,
-        defaultActor: actor,
-        defaultNotes: notes,
-        nextStage: 1,
-      });
-      return;
-    }
-    if (stage === 1) {
-      const curStep = steps[stepIndex];
-      if (steps.length > 0 && stepIndex < steps.length - 1) {
-        const nextStep = steps[stepIndex + 1];
-        const actor = 'Thabo';
-        const notes = `${stepLabel(curStep)} complete, tolerance checked`;
-        setSignOffActor(actor);
-        setSignOffNotes(notes);
-        setSignOffPrompt({
-          title: `${stepLabel(curStep)} Sign-Off`,
-          subtitle: `Hand off from ${stepLabel(curStep)} to ${stepLabel(nextStep)}.`,
-          action: `${stepLabel(curStep)} completed`,
-          stage: 1,
-          step: curStep,
-          defaultActor: actor,
-          defaultNotes: notes,
-          isProductionStepAdvance: true,
-          nextStepIndex: stepIndex + 1,
-        });
-        return;
-      }
-      const actor = 'Thabo';
-      const notes = 'All manufacturing steps completed and checked';
-      setSignOffActor(actor);
-      setSignOffNotes(notes);
-      setSignOffPrompt({
-        title: 'Production Complete',
-        subtitle: 'Manufacturing complete. Move order to Dispatch.',
-        action: curStep ? `${stepLabel(curStep)} completed` : 'Production completed',
-        stage: 1,
-        step: curStep ?? null,
-        defaultActor: actor,
-        defaultNotes: notes,
-        nextStage: 2,
-      });
-      return;
-    }
-    if (stage === 2) {
-      const actor = 'Lerato';
-      const notes = 'Packed and dispatched to site';
-      setSignOffActor(actor);
-      setSignOffNotes(notes);
-      setSignOffPrompt({
-        title: 'Dispatch Sign-Off',
-        subtitle: 'Order crated, packed, and leaving workshop.',
-        action: 'Dispatched',
-        stage: 2,
-        step: null,
-        defaultActor: actor,
-        defaultNotes: notes,
-        nextStage: 3,
-      });
-      return;
-    }
-    if (stage === 3) {
-      const actor = 'Thabo & Sipho';
-      const notes = 'Installed in store and signed off with site manager';
-      setSignOffActor(actor);
-      setSignOffNotes(notes);
-      setSignOffPrompt({
-        title: 'Installation Sign-Off',
-        subtitle: 'Installation completed on site with final client sign-off.',
-        action: 'Installed & signed off',
-        stage: 3,
-        step: null,
-        defaultActor: actor,
-        defaultNotes: notes,
-        isComplete: true,
-      });
-      return;
-    }
+    const prompt = signOffFor(order, operator);
+    setSignOffActor(prompt.defaultActor);
+    setSignOffNotes(prompt.defaultNotes);
+    setSignOffPrompt(prompt);
   };
 
   const confirmSignOff = async () => {
     if (!signOffPrompt) return;
-    const actor = signOffActor.trim() || signOffPrompt.defaultActor;
-    const notes = signOffNotes.trim() || null;
-    await addStageEvent(
-      order.id,
-      signOffPrompt.stage,
-      signOffPrompt.step,
-      signOffPrompt.action,
-      actor,
-      notes
-    );
-
-    if (signOffPrompt.isReopen) {
-      await updateOrderStage(order.id, 3, false);
-    } else if (signOffPrompt.isProductionStepAdvance && signOffPrompt.nextStepIndex !== undefined) {
-      await updateOrderProductionStep(order.id, signOffPrompt.nextStepIndex);
-    } else if (signOffPrompt.isComplete) {
-      await updateOrderStage(order.id, 3, true);
-    } else if (signOffPrompt.nextStage !== undefined) {
-      await updateOrderStage(order.id, signOffPrompt.nextStage);
-      if (signOffPrompt.nextStage === 1) await updateOrderProductionStep(order.id, 0);
-    }
-
+    await applySignOff(order, signOffPrompt, signOffActor, signOffNotes);
     setSignOffPrompt(null);
     await reload();
   };
@@ -595,12 +469,12 @@ export function OrderScreen({ route, navigation }: Props) {
               style={styles.sheetInput}
               value={signOffActor}
               onChangeText={setSignOffActor}
-              placeholder={signOffPrompt?.defaultActor}
+              placeholder={signOffPrompt?.defaultActor || 'Name (add your team under Settings)'}
               placeholderTextColor={colors.textMuted}
             />
 
             <View style={styles.quickPills}>
-              {['Thabo', 'Sizwe', 'Lerato', order.clientName ? `${order.clientName} (Client)` : 'Client'].map((name) => (
+              {[...staff, clientActor(order)].map((name) => (
                 <Pressable
                   key={name}
                   style={[styles.quickPill, signOffActor === name && styles.quickPillActive]}

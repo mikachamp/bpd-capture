@@ -38,6 +38,23 @@ export function currentStep(order: Pick<Order, 'stage' | 'productionStep' | 'pro
   return steps[Math.min(order.productionStep ?? 0, steps.length - 1)] ?? null;
 }
 
+/** Which bench (see db/team.ts) the order is waiting at now, or null when it's completed. */
+export function benchOf(order: Pick<Order, 'stage' | 'productionStep' | 'productionSteps' | 'status'>): string | null {
+  if (order.status === 'completed') return null;
+  if (order.stage === 0) return 'sample';
+  if (order.stage === 1) return currentStep(order) ?? 'finishing';
+  if (order.stage === 2) return 'dispatch';
+  return 'install';
+}
+
+/** The name of what is happening now, for big headings: "Fabricating", "Sample", "Dispatch", "Install". */
+export function nowLabel(order: Pick<Order, 'stage' | 'productionStep' | 'productionSteps' | 'status'>): string {
+  if (order.status === 'completed') return 'Completed';
+  const step = currentStep(order);
+  if (step) return stepLabel(step);
+  return ['Sample', 'Production', 'Dispatch', 'Install'][order.stage] ?? 'Sample';
+}
+
 /** e.g. "Production · Fabricating" for lists. */
 export function whereLabel(order: Pick<Order, 'stage' | 'productionStep' | 'productionSteps' | 'status'>): string {
   if (order.status === 'completed') return 'Completed';

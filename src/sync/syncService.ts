@@ -44,8 +44,13 @@ export function onSyncedData(listener: () => void): () => void {
   return () => dataListeners.delete(listener);
 }
 
-/** The "BPD Capture Next" test build syncs to its own branch so test jobs never mix with real ones. */
-const dataBranch = () => (Application.applicationId?.endsWith('.next') ? 'data-next' : DATA_BRANCH);
+/** Test builds ("Next", "Floor") sync to their own branches so test jobs never mix with real ones. */
+const dataBranch = () => {
+  const id = Application.applicationId ?? '';
+  if (id.endsWith('.next')) return 'data-next';
+  if (id.endsWith('.floor')) return 'data-floor';
+  return DATA_BRANCH;
+};
 
 const deviceName = () => `phone (${(Platform.constants as { Model?: string }).Model ?? Platform.OS})`;
 

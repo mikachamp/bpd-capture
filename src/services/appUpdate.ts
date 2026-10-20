@@ -52,8 +52,9 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
   if (Platform.OS === 'web') {
     throw new Error('Update checks only work in the installed Android app.');
   }
-  if (Application.applicationId?.endsWith('.next')) {
-    throw new Error('This is the BPD Capture Next test build. New test versions are installed as separate APKs, not through this button.');
+  const id = Application.applicationId ?? '';
+  if (id.endsWith('.next') || id.endsWith('.floor')) {
+    throw new Error('This is a BPD Capture test build. New test versions are installed as separate APKs, not through this button.');
   }
 
   // Signed in: read releases with the sync login, which also works once the repo is private.

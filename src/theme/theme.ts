@@ -1,12 +1,15 @@
 import { Platform } from 'react-native';
+import * as Application from 'expo-application';
 
 /**
- * Single source of truth for color/spacing/type so every screen reads as
- * one system. Palette: "Ink & ember" (2026-10 redesign) — deep navy surfaces,
- * soft blue-white text, and one warm orange accent used only for the main
- * action on a screen. See DESIGN_SYSTEM.md.
+ * "BPD Capture Floor" (APP_VARIANT=floor, package ending .floor) is the
+ * workshop-floor build: light concrete grey, charcoal, one safety yellow,
+ * Barlow / Barlow Condensed, glove-sized controls. Every other build keeps
+ * Ink & ember. Decided once at startup from the installed package name.
  */
-export const colors = {
+export const isFloor = (Application.applicationId ?? '').endsWith('.floor');
+
+const inkAndEmber = {
   background: '#0F141C',
   backgroundTop: '#141C27',
   surface: '#172030',
@@ -37,7 +40,72 @@ export const colors = {
   dangerTint: '#3A1820',
 
   dark: '#000000',
-} as const;
+};
+
+type Palette = { [K in keyof typeof inkAndEmber]: string };
+
+/** Floor Mode: concrete grey ground, charcoal ink, safety yellow only for "do this now". */
+const floorDay: Palette = {
+  background: '#D5D7D3',
+  backgroundTop: '#D5D7D3',
+  surface: '#ECEDEA',
+  surfaceMuted: '#E1E3DF',
+  border: '#B9BCB7',
+
+  textPrimary: '#202326',
+  textSecondary: '#3B4045',
+  textMuted: '#5A5F64',
+  textOnDark: '#F1F2EE',
+
+  accent: '#F2C12E',
+  accentPressed: '#DDAE1F',
+  accentTint: '#F5E3A8',
+  accentInk: '#202326',
+
+  selected: '#202326',
+  selectedText: '#F1F2EE',
+
+  secondary: '#2F5DB5',
+
+  success: '#2E7D4F',
+  successTint: '#CFE5D6',
+  warning: '#9A6411',
+  warningTint: '#F1E0BF',
+  danger: '#B83A22',
+  dangerTint: '#F1D2CB',
+
+  dark: '#000000',
+};
+
+/** Floor "Night Shift": the same layout dark and high-contrast, for installers in store at night or in sun glare. */
+export const nightColors: Palette = {
+  ...floorDay,
+  background: '#15171A',
+  backgroundTop: '#15171A',
+  surface: '#23262B',
+  surfaceMuted: '#2E3238',
+  border: '#3A3F46',
+  textPrimary: '#F1F2EE',
+  textSecondary: '#D2D5D8',
+  textMuted: '#A2A7AD',
+  selected: '#F1F2EE',
+  selectedText: '#15171A',
+  success: '#5FBF8A',
+  successTint: '#1D3528',
+  danger: '#F06A4E',
+  dangerTint: '#3D1E18',
+};
+
+/**
+ * Single source of truth for color/spacing/type so every screen reads as
+ * one system. Default palette: "Ink & ember" (2026-10 redesign) — deep navy
+ * surfaces, soft blue-white text, and one warm orange accent used only for the
+ * main action on a screen. The Floor build swaps in floorDay. See DESIGN_SYSTEM.md.
+ */
+export const colors: Palette = isFloor ? floorDay : inkAndEmber;
+
+/** Floor Mode stage colours (the stage band on an order, the job's stage bar). Never yellow: yellow means "act". */
+export const stageColors = ['#6B5CA5', '#2F5DB5', '#2E8063', '#202326'] as const;
 
 /**
  * Kept for screens that still draw a two-stop fill: both stops are the accent,
@@ -45,10 +113,14 @@ export const colors = {
  */
 export const gradientAccent = [colors.accent, colors.accent] as const;
 
-/** Outfit, embedded at build time by the expo-font plugin (weights 300–600). */
+/**
+ * Outfit (Ink & ember) or Barlow + Barlow Condensed (Floor), embedded at build
+ * time by the expo-font plugin. `condensed` is for labels and the big step name.
+ */
 export const fonts = {
-  family: 'Outfit',
-} as const;
+  family: isFloor ? 'Barlow' : 'Outfit',
+  condensed: isFloor ? 'Barlow Condensed' : 'Outfit',
+};
 
 export const spacing = {
   xs: 4,

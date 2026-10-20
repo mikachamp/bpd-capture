@@ -4,6 +4,32 @@ Written so a fresh agent (or human) can pick up exactly where this session left 
 Read this fully before doing anything — especially before re-running builds or killing
 processes, since some of this documents *why* certain choices were made.
 
+## TL;DR — current state (2026-10-20, review of another agent's work + new style exploration)
+
+**Another agent committed d12316a on `redesign` (pushed, 2026-10-19):** schema v5 `stage_history`
+(sign-off sheet + timeline) and v6 `order_items` (work ticket checklist with −/+ counts), an `ml/`
+Donut ticket-reading pipeline (synthetic tickets, not wired into the app), and a desktop redesign
+(Ink & ember, stepper, sign-offs, checklist; desktop is still not in git). It also left an
+untracked `graphify-out/` folder (code map). Checks after review: mobile typecheck clean,
+`security:check` clean (100 files), `test:sync` 9/9, desktop typecheck clean, desktop rebuilt and
+opened fine. Not yet tested on the emulator.
+
+Open problems found (none fixed yet; user logged off before choosing):
+1. `ml/dataset_generator.py` + `ml/dataset/metadata.jsonl` contain contact names/emails/phones
+   that may be real (e.g. a TFG contact) in a **public** repo. Ask the user; if real, replace and
+   purge from history.
+2. `stage_history` and `order_items` have no uuid/updatedAt/tombstones, so they **don't sync**.
+3. Sign-off quick-pick names (Thabo, Sizwe, Lerato) are hard-coded examples; should be an
+   editable staff list in Settings.
+4. Desktop headings use emoji (📜 📋), which breaks the no-emoji rule.
+5. DESIGN_SYSTEM.md changelog dates v5 to 2026-10-17 though it landed in the 10-19 commit.
+
+**Style exploration:** the user feels Ink & ember still looks generic/AI. Directions page:
+https://claude.ai/artifact/Dq4WHm6qCv8yQ9RW1H3qqw (A Work Ticket, B Shop Signage, C Floor Mode,
+D Sample Wall; C2 Night Shift, C3 Stage colours; E Device Panel, F Dot Matrix, G Hard Edge).
+**User likes C (Floor Mode).** Recommended: C3 as the main app, C2 auto-on for installers,
+optionally F's dot-matrix numerals for counts. Waiting on the user's pick before building.
+
 ## TL;DR — current state (2026-10-14 late, production steps in BPD Capture Next)
 
 User request: track manufacturing inside Production. Confirmed with the user:

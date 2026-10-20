@@ -35,6 +35,45 @@ export type JobRecord = {
   stage?: number;
   productionSteps?: string;
   productionStep?: number;
+  holdReason?: string | null;
+  dispatchMethod?: string | null;
+  waybill?: string | null;
+  siteName?: string | null;
+  /**
+   * Sign-offs and work ticket items ride inside their job's file. They are
+   * merged record by record (by uuid, newest updatedAt wins), never replaced
+   * wholesale, so two devices adding sign-offs to one job both keep theirs.
+   */
+  history?: HistoryRecord[];
+  items?: ItemRecord[];
+};
+
+export type HistoryRecord = {
+  uuid: string;
+  stage: number;
+  step: string | null;
+  action: string;
+  actor: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ItemRecord = {
+  uuid: string;
+  description: string;
+  size: string | null;
+  material: string | null;
+  process: string | null;
+  quantity: number;
+  completedQty: number;
+  step: string | null;
+  isCompleted: boolean;
+  wtNumber: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Soft delete, so removing an item on one device removes it on the others. */
+  deleted: boolean;
 };
 
 export type MediaRecord = {
@@ -68,6 +107,8 @@ export interface SyncStore {
 
   /** Insert or overwrite from GitHub, marking it synced at record.updatedAt. Returns true for a job new to this device. */
   applyJob(record: JobRecord): Promise<boolean>;
+  /** Merge only the job's sign-offs and items (used when the local job fields are newer and win). */
+  mergeJobChildren(record: JobRecord): Promise<void>;
   applyClient(record: ClientRecord): Promise<void>;
   /** base64 is null when only the metadata changed and the local file is kept. */
   applyMedia(record: MediaRecord, base64: string | null): Promise<void>;
@@ -283,6 +324,9 @@ export async function syncOnce(gh: GitHub, store: SyncStore, deviceName: string)
           const isNew = await store.applyJob(record);
           result.pulledJobs++;
           if (isNew) result.newJobs.push(record);
+        } else {
+          // Our job fields are newer, but the other device's sign-offs/items still count.
+          await store.mergeJobChildren(record);
         }
       }
       for (const path of changed.filter((p) => p.startsWith('clients/'))) {

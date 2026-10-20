@@ -15,6 +15,9 @@ import { colors, fonts, radius, spacing } from '../theme/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Capture'>;
 
+/** Text on the camera's dark overlay: always light, whatever the app palette. */
+const OVERLAY_TEXT = '#C9D1DC';
+
 /**
  * Multi-shot camera. Stays open between shots (a typical job is 10–15
  * photos), files every shot under the chosen stage, and on Installed pairs
@@ -191,14 +194,14 @@ const styles = StyleSheet.create({
   round: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(15,20,28,0.6)', alignItems: 'center', justifyContent: 'center' },
   headInfo: { flex: 1, backgroundColor: 'rgba(15,20,28,0.6)', borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: 6 },
   headTitle: { fontFamily: fonts.family, fontSize: 14, fontWeight: '500', color: '#FFFFFF' },
-  headSub: { fontFamily: fonts.family, fontSize: 12, color: colors.textSecondary },
+  headSub: { fontFamily: fonts.family, fontSize: 12, color: OVERLAY_TEXT },
   counter: { minWidth: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(15,20,28,0.6)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
   counterText: { fontFamily: fonts.family, fontSize: 16, fontWeight: '500', color: '#FFFFFF' },
   tray: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.lg, backgroundColor: 'rgba(11,15,21,0.55)' },
   pills: { flexDirection: 'row', justifyContent: 'center', gap: 6, flexWrap: 'wrap' },
   pill: { height: 34, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: 'rgba(23,32,48,0.85)', justifyContent: 'center' },
   pillOn: { backgroundColor: colors.accent },
-  pillText: { fontFamily: fonts.family, fontSize: 13, color: colors.textSecondary },
+  pillText: { fontFamily: fonts.family, fontSize: 13, color: OVERLAY_TEXT },
   pillTextOn: { color: colors.accentInk, fontWeight: '500' },
   sidePill: { height: 30, paddingHorizontal: 12, borderRadius: radius.pill, backgroundColor: 'rgba(23,32,48,0.85)', justifyContent: 'center' },
   sidePillOn: { backgroundColor: colors.selected, borderWidth: 1, borderColor: colors.accent },
@@ -208,7 +211,7 @@ const styles = StyleSheet.create({
   last: { width: 48, height: 48, borderRadius: 12 },
   lastEmpty: { backgroundColor: 'rgba(23,32,48,0.85)' },
   modes: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md },
-  mode: { fontFamily: fonts.family, fontSize: 13, color: colors.textSecondary },
+  mode: { fontFamily: fonts.family, fontSize: 13, color: OVERLAY_TEXT },
   modeOn: { color: colors.accent, fontWeight: '500' },
   shutter: { width: 78, height: 78, borderRadius: 39, borderWidth: 4, borderColor: 'rgba(255,255,255,0.35)', alignItems: 'center', justifyContent: 'center' },
   shutterRecording: { borderColor: colors.danger },

@@ -22,6 +22,14 @@ export type Order = {
   productionSteps: string;
   /** Index into this order's production steps while it is in Production. */
   productionStep: number;
+  /** Why the job is stuck (e.g. "Waiting for parts"); null when it isn't on hold. */
+  holdReason?: string | null;
+  /** How it left the workshop: courier, own installer, collection... */
+  dispatchMethod?: string | null;
+  /** Courier waybill or tracking number. */
+  waybill?: string | null;
+  /** Store or site it is installed at. */
+  siteName?: string | null;
   /** The order's first photo (by capture order), for list-row thumbnails. Not a stored column — computed by a subquery in every listing/search query in db/orders.ts. */
   coverImage?: string | null;
 };
@@ -51,6 +59,7 @@ export type MediaItem = {
 
 export type StageEvent = {
   id: number;
+  uuid?: string;
   orderId: number;
   stage: Stage;
   step: string | null;
@@ -62,6 +71,7 @@ export type StageEvent = {
 
 export type OrderItem = {
   id: number;
+  uuid?: string;
   orderId: number;
   description: string;
   size: string | null;

@@ -118,4 +118,7 @@ export async function seedDemoDataIfEmpty(): Promise<void> {
       );
     }
   }
+  // Give the sample sign-offs and items the same ids and stamps real ones get (schema v7).
+  await db.runAsync(`UPDATE stage_history SET uuid = lower(hex(randomblob(16))), updatedAt = createdAt WHERE uuid IS NULL`);
+  await db.runAsync(`UPDATE order_items SET uuid = lower(hex(randomblob(16))), updatedAt = createdAt WHERE uuid IS NULL`);
 }

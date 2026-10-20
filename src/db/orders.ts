@@ -278,6 +278,16 @@ export async function updateOrderProductionSteps(id: number, steps: string): Pro
   notifyLocalChange();
 }
 
+/**
+ * Sign-offs and work ticket items travel inside their job's sync record, so any
+ * change to them also bumps the order's updatedAt (that is what marks the job
+ * for upload).
+ */
+async function touchOrder(orderId: number, now: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`UPDATE orders SET updatedAt = ? WHERE id = ?`, now, orderId);
+}
+
 /** Records a sign-off or stage change event in the order's audit trail. */
 export async function addStageEvent(
   orderId: number,
@@ -292,15 +302,17 @@ export async function addStageEvent(
   if (isWeb) return webOrders.addStageEvent(orderId, stage, step, action, actor, notes, ts);
   const db = await getDb();
   const res = await db.runAsync(
-    `INSERT INTO stage_history (orderId, stage, step, action, actor, notes, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO stage_history (uuid, orderId, stage, step, action, actor, notes, createdAt, updatedAt) VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?)`,
     orderId,
     stage,
     step,
     action,
     actor,
     notes,
+    ts,
     ts
   );
+  await touchOrder(orderId, new Date().toISOString());
   notifyLocalChange();
   return {
     id: res.lastInsertRowId,
@@ -324,18 +336,28 @@ export async function listStageEventsForOrder(orderId: number): Promise<StageEve
   );
 }
 
-/** Returns the work ticket checklist items for an order. */
+/** Returns the work ticket checklist items for an order (deleted ones are kept for sync but hidden). */
 export async function listOrderItemsForOrder(orderId: number): Promise<OrderItem[]> {
   if (isWeb) return webOrders.listOrderItems(orderId);
   const db = await getDb();
-  const rows = await db.getAllAsync<any>(
-    `SELECT * FROM order_items WHERE orderId = ? ORDER BY id ASC`,
+  const rows = await db.getAllAsync<Omit<OrderItem, 'isCompleted'> & { isCompleted: number }>(
+    `SELECT * FROM order_items WHERE orderId = ? AND deleted = 0 ORDER BY id ASC`,
     orderId
   );
   return rows.map((r) => ({
     ...r,
     isCompleted: Boolean(r.isCompleted),
   }));
+}
+
+/** Pieces done and total across each open order's work ticket, for job lists ("8 of 12"). */
+export async function listItemProgress(): Promise<Map<number, { done: number; total: number }>> {
+  if (isWeb) return new Map();
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ orderId: number; done: number; total: number }>(
+    `SELECT orderId, SUM(completedQty) AS done, SUM(quantity) AS total FROM order_items WHERE deleted = 0 GROUP BY orderId`
+  );
+  return new Map(rows.map((r) => [r.orderId, { done: r.done ?? 0, total: r.total ?? 0 }]));
 }
 
 /** Adds a single work ticket checklist item to an order. */
@@ -347,7 +369,7 @@ export async function addOrderItem(
   if (isWeb) return webOrders.addOrderItem(orderId, item);
   const db = await getDb();
   const res = await db.runAsync(
-    `INSERT INTO order_items (orderId, description, size, material, process, quantity, completedQty, step, isCompleted, wtNumber, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO order_items (uuid, orderId, description, size, material, process, quantity, completedQty, step, isCompleted, wtNumber, createdAt, updatedAt) VALUES (lower(hex(randomblob(16))), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     orderId,
     item.description,
     item.size,
@@ -358,8 +380,10 @@ export async function addOrderItem(
     item.step,
     item.isCompleted ? 1 : 0,
     item.wtNumber,
+    ts,
     ts
   );
+  await touchOrder(orderId, ts);
   notifyLocalChange();
   return {
     id: res.lastInsertRowId,
@@ -373,12 +397,15 @@ export async function addOrderItem(
 export async function toggleOrderItemCompleted(id: number, isCompleted: boolean): Promise<void> {
   if (isWeb) return webOrders.toggleOrderItem(id, isCompleted);
   const db = await getDb();
+  const now = new Date().toISOString();
   await db.runAsync(
-    `UPDATE order_items SET isCompleted = ?, completedQty = CASE WHEN ? = 1 THEN quantity ELSE completedQty END WHERE id = ?`,
+    `UPDATE order_items SET isCompleted = ?, completedQty = CASE WHEN ? = 1 THEN quantity ELSE completedQty END, updatedAt = ? WHERE id = ?`,
     isCompleted ? 1 : 0,
     isCompleted ? 1 : 0,
+    now,
     id
   );
+  await db.runAsync(`UPDATE orders SET updatedAt = ? WHERE id = (SELECT orderId FROM order_items WHERE id = ?)`, now, id);
   notifyLocalChange();
 }
 
@@ -386,20 +413,25 @@ export async function toggleOrderItemCompleted(id: number, isCompleted: boolean)
 export async function updateOrderItemCompletedQty(id: number, completedQty: number): Promise<void> {
   if (isWeb) return webOrders.updateOrderItemQty(id, completedQty);
   const db = await getDb();
+  const now = new Date().toISOString();
   await db.runAsync(
-    `UPDATE order_items SET completedQty = ?, isCompleted = CASE WHEN ? >= quantity THEN 1 ELSE 0 END WHERE id = ?`,
+    `UPDATE order_items SET completedQty = ?, isCompleted = CASE WHEN ? >= quantity THEN 1 ELSE 0 END, updatedAt = ? WHERE id = ?`,
     completedQty,
     completedQty,
+    now,
     id
   );
+  await db.runAsync(`UPDATE orders SET updatedAt = ? WHERE id = (SELECT orderId FROM order_items WHERE id = ?)`, now, id);
   notifyLocalChange();
 }
 
-/** Deletes a work ticket item. */
+/** Deletes a work ticket item (soft delete, so the delete syncs to the other devices). */
 export async function deleteOrderItem(id: number): Promise<void> {
   if (isWeb) return webOrders.deleteOrderItem(id);
   const db = await getDb();
-  await db.runAsync(`DELETE FROM order_items WHERE id = ?`, id);
+  const now = new Date().toISOString();
+  await db.runAsync(`UPDATE order_items SET deleted = 1, updatedAt = ? WHERE id = ?`, now, id);
+  await db.runAsync(`UPDATE orders SET updatedAt = ? WHERE id = (SELECT orderId FROM order_items WHERE id = ?)`, now, id);
   notifyLocalChange();
 }
 
@@ -416,3 +448,28 @@ export async function addOrderItemsBatch(
   return result;
 }
 
+/** Puts a job on hold with a reason ("Waiting for parts"), or takes it off hold with null. */
+export async function updateOrderHold(id: number, holdReason: string | null): Promise<void> {
+  if (isWeb) return;
+  const db = await getDb();
+  await db.runAsync(`UPDATE orders SET holdReason = ?, updatedAt = ? WHERE id = ?`, holdReason?.trim() || null, new Date().toISOString(), id);
+  notifyLocalChange();
+}
+
+/** How the order left the workshop, its waybill/tracking number, and the store or site it goes to. */
+export async function updateOrderLogistics(
+  id: number,
+  fields: { dispatchMethod: string | null; waybill: string | null; siteName: string | null }
+): Promise<void> {
+  if (isWeb) return;
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE orders SET dispatchMethod = ?, waybill = ?, siteName = ?, updatedAt = ? WHERE id = ?`,
+    fields.dispatchMethod?.trim() || null,
+    fields.waybill?.trim() || null,
+    fields.siteName?.trim() || null,
+    new Date().toISOString(),
+    id
+  );
+  notifyLocalChange();
+}
