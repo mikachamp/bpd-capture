@@ -144,7 +144,7 @@ export function FloorJobsScreen({ navigation }: Props) {
               <View style={[styles.edge, { backgroundColor: edge }]} />
               <View style={styles.rowBody}>
                 <Text style={styles.project} numberOfLines={2}>{item.projectName || item.ceNumber}</Text>
-                <Text style={styles.meta} numberOfLines={1}>
+                <Text style={styles.meta} numberOfLines={2}>
                   {item.ceNumber} · {whereLabel(item)}
                   {count && count.total > 0 ? ` · ${count.done}/${count.total}` : ''}
                   {' · '}

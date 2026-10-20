@@ -119,7 +119,15 @@ export function FloorOrderScreen({ route, navigation }: Props) {
     return { text: `Due ${format(parseISO(order.dueDate), 'EEE d MMM')} · ${days} day${days === 1 ? '' : 's'} left`, late: false };
   })();
 
-  const where = completed ? 'Completed' : stage === 1 && steps.length > 0 ? `Production · step ${stepIndex + 1} of ${steps.length}` : stageLabel(stage);
+  const where = completed
+    ? 'Completed'
+    : stage === 0
+      ? 'Sample for client approval'
+      : stage === 1
+        ? steps.length > 0 ? `Production · step ${stepIndex + 1} of ${steps.length}` : 'Production'
+        : stage === 2
+          ? 'Packing and sending'
+          : order.siteName ? `In store · ${order.siteName}` : 'In store';
   const doneLabel = completed ? 'Reopen job' : stage === 0 ? 'Client approved' : stage === 3 ? 'Installed' : `${nowLabel(order)} done`;
 
   const openSignOff = () => {
@@ -319,7 +327,7 @@ export function FloorOrderScreen({ route, navigation }: Props) {
             <Pressable key={item.id} style={[styles.item, item.isCompleted && styles.itemDone]} onLongPress={() => removeItem(item)} delayLongPress={600}>
               <View style={styles.itemBody}>
                 <Text style={styles.itemName} numberOfLines={2}>{item.description}</Text>
-                <Text style={styles.itemMeta} numberOfLines={1}>
+                <Text style={styles.itemMeta} numberOfLines={2}>
                   of {item.quantity}{item.size ? ` · ${item.size}` : ''}{item.material ? ` · ${item.material}` : ''}{item.step ? ` · ${stepLabel(item.step)}` : ''}
                 </Text>
               </View>
