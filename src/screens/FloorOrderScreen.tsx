@@ -28,6 +28,7 @@ import { onSyncedData } from '../sync/syncService';
 import type { MediaItem, Order, OrderItem, Stage, StageEvent } from '../types/models';
 import { PRODUCTION_STEPS, STAGES, currentStep, nowLabel, stageLabel, stepLabel, stepsFor, type ProductionStepKey } from '../utils/stages';
 import { applySignOff, clientActor, signOffFor, type SignOffPrompt } from '../utils/signOff';
+import { reportExtras } from '../utils/reportKind';
 import { Icon } from '../components/Icon';
 import { MediaPreview } from '../components/MediaGrid';
 import { colors as dayColors, fonts, nightColors, radius, spacing, stageColors } from '../theme/theme';
@@ -199,7 +200,7 @@ export function FloorOrderScreen({ route, navigation }: Props) {
     }
     setExporting(kind);
     try {
-      await exportAndShareJobReport(order, list);
+      await exportAndShareJobReport(order, list, reportExtras(kind, order, history, items));
     } catch {
       Alert.alert('Report not made', 'Could not create the report. Please try again.');
     } finally {

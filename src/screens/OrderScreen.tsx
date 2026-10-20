@@ -8,6 +8,7 @@ import type { RootStackParamList } from '../navigation/types';
 import { deleteOrder, getOrderById, listOrderItemsForOrder, listStageEventsForOrder, toggleOrderItemCompleted, updateOrderItemCompletedQty, updateOrderProductionStep, updateOrderProductionSteps, updateOrderStage } from '../db/orders';
 import { getOperator, getStaff } from '../db/team';
 import { applySignOff, clientActor, signOffFor, type SignOffPrompt } from '../utils/signOff';
+import { reportExtras } from '../utils/reportKind';
 import { deleteMediaItem, listMediaForOrder } from '../db/mediaItems';
 import { deleteMediaFile, deleteOrderDirectory } from '../services/storage';
 import { exportAndShareJobReport } from '../services/reportPdf';
@@ -151,7 +152,7 @@ export function OrderScreen({ route, navigation }: Props) {
     }
     setExporting(kind);
     try {
-      await exportAndShareJobReport(order, items);
+      await exportAndShareJobReport(order, items, reportExtras(kind, order, history, orderItems));
     } catch {
       Alert.alert('Export failed', 'Could not create the report. Please try again.');
     } finally {

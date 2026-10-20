@@ -7,7 +7,8 @@ import { endOfDay, format, startOfDay } from 'date-fns';
 import { listCompletedOrdersInRange } from '../db/orders';
 import { listMediaForOrder } from '../db/mediaItems';
 import { getDispatcherContact } from '../db/settings';
-import type { MediaItem, Order } from '../types/models';
+import type { MediaItem, Order, OrderItem, StageEvent } from '../types/models';
+import { colors } from '../theme/theme';
 
 function escapeHtml(value: string): string {
   return value
@@ -43,7 +44,7 @@ async function photoToDataUri(item: MediaItem): Promise<string | null> {
 const SHARED_STYLES = `
   * { box-sizing: border-box; }
   body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 0; color: #14161C; }
-  .header { background: linear-gradient(135deg, #4FC3F7, #7C4DFF); color: #ffffff; padding: 28px 36px; }
+  .header { background: #202326; color: #ffffff; padding: 28px 36px; border-bottom: 6px solid ${colors.accent}; }
   .header .brand { font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; opacity: 0.85; }
   .header h1 { margin: 6px 0 0; font-size: 24px; font-weight: 800; }
   .header .subtitle { margin-top: 6px; font-size: 14px; opacity: 0.92; }
@@ -67,8 +68,21 @@ const SHARED_STYLES = `
   .photo-grid img { width: 150px; height: 150px; object-fit: cover; border-radius: 8px; border: 1px solid #E6E8EF; }
   .empty-note { font-size: 13px; color: #9C9BA3; }
   .video-list { font-size: 12px; color: #6E6D74; line-height: 1.6; }
+  table.rows { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.rows th { text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #6E6D74; padding: 6px 8px; border-bottom: 1px solid #D9DBE2; }
+  table.rows td { padding: 8px; border-bottom: 1px solid #EEF0F4; vertical-align: top; }
+  table.rows td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .side-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #3B4045; margin: 10px 0 6px; }
   .footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid #E6E8EF; font-size: 10px; color: #9C9BA3; }
 `;
+
+/** Extra detail for a single-job report: what it is called, who signed what off, and the work ticket. */
+export type ReportExtras = {
+  /** e.g. "Sample approval", "Installation proof", "Office record". */
+  title?: string;
+  history?: StageEvent[];
+  items?: OrderItem[];
+};
 
 function jobMetaItems(order: Order): { label: string; value: string }[] {
   return [
@@ -79,22 +93,59 @@ function jobMetaItems(order: Order): { label: string; value: string }[] {
     },
     { label: 'Opened', value: format(new Date(order.createdAt), 'MMM d, yyyy') },
     ...(order.completedAt ? [{ label: 'Completed', value: format(new Date(order.completedAt), 'MMM d, yyyy') }] : []),
+    ...(order.dispatchMethod ? [{ label: 'Sent by', value: order.dispatchMethod }] : []),
+    ...(order.waybill ? [{ label: 'Waybill', value: order.waybill }] : []),
+    ...(order.siteName ? [{ label: 'Store / site', value: order.siteName }] : []),
   ];
+}
+
+function signOffsHtml(history: StageEvent[] | undefined): string {
+  if (!history || history.length === 0) return '';
+  const rows = history
+    .map(
+      (e) =>
+        `<tr><td>${escapeHtml(e.action)}</td><td>${escapeHtml(e.actor)}</td><td>${escapeHtml(format(new Date(e.createdAt), 'd MMM yyyy, HH:mm'))}</td><td>${escapeHtml(e.notes ?? '')}</td></tr>`
+    )
+    .join('');
+  return `<div class="section-title">Sign-offs</div><table class="rows"><tr><th>What</th><th>Who</th><th>When</th><th>Note</th></tr>${rows}</table>`;
+}
+
+function itemsHtml(items: OrderItem[] | undefined): string {
+  if (!items || items.length === 0) return '';
+  const rows = items
+    .map((i) => {
+      const detail = [i.size, i.material].filter(Boolean).join(' · ');
+      return `<tr><td>${escapeHtml(i.description)}${detail ? `<br/><span style="color:#6E6D74">${escapeHtml(detail)}</span>` : ''}</td><td class="num">${i.completedQty} of ${i.quantity}</td></tr>`;
+    })
+    .join('');
+  return `<div class="section-title">Work ticket</div><table class="rows"><tr><th>Item</th><th style="text-align:right">Done</th></tr>${rows}</table>`;
+}
+
+async function photoTagsFor(photos: MediaItem[]): Promise<string> {
+  const uris = await Promise.all(photos.map(photoToDataUri));
+  return uris
+    .filter((uri): uri is string => uri !== null)
+    .map((uri) => `<img src="${uri}" />`)
+    .join('');
 }
 
 async function buildJobSectionHtml(
   order: Order,
   media: MediaItem[],
-  opts: { pageBreakBefore: boolean }
+  opts: { pageBreakBefore: boolean; extras?: ReportExtras }
 ): Promise<string> {
   const photos = media.filter((m) => m.type === 'photo');
   const videos = media.filter((m) => m.type === 'video');
 
-  const photoDataUris = await Promise.all(photos.map(photoToDataUri));
-  const photoTags = photoDataUris
-    .filter((uri): uri is string => uri !== null)
-    .map((uri) => `<img src="${uri}" />`)
-    .join('');
+  // Installation photos marked before/after are shown as two groups: the proof the client needs.
+  const before = photos.filter((m) => m.side === 'before');
+  const after = photos.filter((m) => m.side === 'after');
+  const paired = before.length > 0 && after.length > 0;
+  const photoTags = paired
+    ? `<div class="side-label">Before</div><div class="photo-grid">${await photoTagsFor(before)}</div>` +
+      `<div class="side-label">After</div><div class="photo-grid">${await photoTagsFor(after)}</div>` +
+      (photos.length > before.length + after.length ? `<div class="side-label">Other</div><div class="photo-grid">${await photoTagsFor(photos.filter((m) => !m.side))}</div>` : '')
+    : await photoTagsFor(photos);
 
   const metaItems = jobMetaItems(order);
 
@@ -113,8 +164,10 @@ async function buildJobSectionHtml(
         .join('')}
     </div>
     ${order.notes ? `<div class="section-title">Notes</div><div class="notes-box">${escapeHtml(order.notes)}</div>` : ''}
+    ${signOffsHtml(opts.extras?.history)}
+    ${itemsHtml(opts.extras?.items)}
     <div class="section-title">Photos (${photos.length})</div>
-    ${photoTags ? `<div class="photo-grid">${photoTags}</div>` : '<div class="empty-note">No photos captured for this job.</div>'}
+    ${photoTags ? (paired ? photoTags : `<div class="photo-grid">${photoTags}</div>`) : '<div class="empty-note">No photos captured for this job.</div>'}
     ${
       videos.length > 0
         ? `<div class="section-title">Videos (${videos.length})</div><div class="video-list">${videos
@@ -125,8 +178,8 @@ async function buildJobSectionHtml(
   </div>`;
 }
 
-async function buildReportHtml(order: Order, media: MediaItem[]): Promise<string> {
-  const section = await buildJobSectionHtml(order, media, { pageBreakBefore: false });
+async function buildReportHtml(order: Order, media: MediaItem[], extras?: ReportExtras): Promise<string> {
+  const section = await buildJobSectionHtml(order, media, { pageBreakBefore: false, extras });
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -136,7 +189,7 @@ async function buildReportHtml(order: Order, media: MediaItem[]): Promise<string
 <body>
   <div class="header">
     <div class="brand">Blueprint Digital &middot; BPD Capture</div>
-    <h1>Field Report &mdash; ${escapeHtml(order.ceNumber)}</h1>
+    <h1>${escapeHtml(extras?.title ?? 'Field Report')} &mdash; ${escapeHtml(order.ceNumber)}</h1>
     <div class="subtitle">${escapeHtml(order.projectName || 'No project name on file')}</div>
   </div>
   <div class="content">
@@ -219,19 +272,20 @@ async function deliverPdf(uri: string, opts: { dialogTitle: string; subject: str
   });
 }
 
-export async function exportAndShareJobReport(order: Order, media: MediaItem[]): Promise<void> {
+export async function exportAndShareJobReport(order: Order, media: MediaItem[], extras?: ReportExtras): Promise<void> {
   if (Platform.OS === 'web') {
     throw new Error('Field report export requires on-device file access and only works in the installed app.');
   }
 
-  const html = await buildReportHtml(order, media);
+  const title = extras?.title ?? 'Field Report';
+  const html = await buildReportHtml(order, media, extras);
   const { uri: printedUri } = await Print.printToFileAsync({ html });
-  const uri = withFriendlyFileName(printedUri, `Field-Report-${order.ceNumber}.pdf`);
+  const uri = withFriendlyFileName(printedUri, `${title.replace(/[^A-Za-z0-9]+/g, '-')}-${order.ceNumber}.pdf`);
 
   await deliverPdf(uri, {
-    dialogTitle: `Share field report — ${order.ceNumber}`,
-    subject: `Field Report — ${order.ceNumber}`,
-    body: `Attached is the field report for ${order.ceNumber}${order.clientName ? ` (${order.clientName})` : ''}.`,
+    dialogTitle: `Share ${title.toLowerCase()} — ${order.ceNumber}`,
+    subject: `${title} — ${order.ceNumber}${order.projectName ? ` · ${order.projectName}` : ''}`,
+    body: `Attached is the ${title.toLowerCase()} for ${order.ceNumber}${order.clientName ? ` (${order.clientName})` : ''}.`,
   });
 }
 
