@@ -3,6 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import type { MediaType } from '../types/models';
 import { isSafeFolderName } from '../utils/ceNumber';
+import { isStrictlyInside, safeFileBaseName } from '../utils/pathGuard';
 
 const GALLERY_ALBUM_NAME = 'BPD Capture';
 const isWeb = Platform.OS === 'web';
@@ -12,11 +13,18 @@ function getOrdersBaseDirectory(): Directory {
 }
 
 function getOrderDirectory(ceNumber: string): Directory {
-  // Last line of defence: a stored CE number must already be a safe folder name.
+  // Last line of defence: a stored CE number must already be a safe folder name…
   if (!isSafeFolderName(ceNumber)) {
     throw new Error(`Refusing to use "${ceNumber}" as a job folder name.`);
   }
-  return new Directory(getOrdersBaseDirectory(), ceNumber);
+  // …and the folder it resolves to must be strictly inside the orders folder
+  // (never the orders folder itself, its parent, or a sibling).
+  const base = getOrdersBaseDirectory();
+  const dir = new Directory(base, ceNumber);
+  if (!isStrictlyInside(base.uri, dir.uri)) {
+    throw new Error(`Refusing to use "${ceNumber}" as a job folder name.`);
+  }
+  return dir;
 }
 
 /**
@@ -92,14 +100,30 @@ export async function renameMediaFile(currentFilePath: string, newBaseName: stri
     return { filePath: currentFilePath, fileName: newBaseName };
   }
 
+  const base = getOrdersBaseDirectory().uri;
+  if (!isStrictlyInside(base, currentFilePath)) {
+    throw new Error('That file is outside BPD Capture’s job folders.');
+  }
+  // A file name only: "../x" or "a/b" must not move the file to another folder.
+  const safeName = safeFileBaseName(newBaseName);
+  if (!safeName) throw new Error('Enter a valid file name.');
   const file = new File(currentFilePath);
-  const destination = new File(file.parentDirectory, `${newBaseName}${file.extension}`);
+  const destination = new File(file.parentDirectory, `${safeName}${file.extension}`);
+  if (!isStrictlyInside(base, destination.uri)) {
+    throw new Error('That file name would move the file out of its job folder.');
+  }
   await file.move(destination);
   return { filePath: file.uri, fileName: file.name };
 }
 
 export async function deleteMediaFile(filePath: string): Promise<void> {
   if (isWeb) return;
+  // Only ever delete inside the job folders. A path from anywhere else is left
+  // alone (and its database row can still be removed by the caller).
+  if (!isStrictlyInside(getOrdersBaseDirectory().uri, filePath)) {
+    console.warn('Not deleting a file outside the job folders:', filePath);
+    return;
+  }
   const file = new File(filePath);
   if (file.exists) {
     file.delete();

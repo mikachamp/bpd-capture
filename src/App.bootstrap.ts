@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { Camera } from 'expo-camera';
 import { initDatabase } from './db/client';
 import { seedDemoDataIfEmpty } from './db/seedDemoData';
+import { listUnsafeCeNumbers } from './db/orders';
 import { ensureBaseDirectoryExists } from './services/storage';
 
 /**
@@ -20,4 +21,8 @@ export async function bootstrapApp(): Promise<void> {
   await initDatabase();
   ensureBaseDirectoryExists();
   await seedDemoDataIfEmpty();
+  // Jobs saved before CE numbers were validated (security review 2026-10-13):
+  // reported, never changed. Their folders are protected by the storage guard.
+  const unsafe = await listUnsafeCeNumbers().catch(() => []);
+  if (unsafe.length > 0) console.warn(`Jobs with a CE number that can't be a folder name (rename them): ${unsafe.map((c) => JSON.stringify(c)).join(', ')}`);
 }

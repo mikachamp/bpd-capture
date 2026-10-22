@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { getDb } from './client';
 import type { Order, OrderStatus } from '../types/models';
-import { assertValidCeNumber, normalizeCeNumber } from '../utils/ceNumber';
+import { assertValidCeNumber, isSafeFolderName, normalizeCeNumber } from '../utils/ceNumber';
 import { DuplicateCeNumberErrorWeb, webOrders } from './webMock';
 
 const isWeb = Platform.OS === 'web';
@@ -224,4 +224,16 @@ export async function searchByClient(rawPartial: string): Promise<Order[]> {
     `SELECT ${ORDER_COLUMNS} FROM orders WHERE clientName LIKE ? ORDER BY createdAt DESC LIMIT 25`,
     `%${partial}%`
   );
+}
+
+/**
+ * CE numbers saved under older rules that can't be used as a folder name
+ * (e.g. "." or ".."). Nothing is changed or deleted: storage refuses to touch
+ * their folders, and the user can rename them to a real CE number.
+ */
+export async function listUnsafeCeNumbers(): Promise<string[]> {
+  if (isWeb) return [];
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ ceNumber: string }>(`SELECT ceNumber FROM orders`);
+  return rows.map((r) => r.ceNumber).filter((ce) => !isSafeFolderName(ce));
 }
