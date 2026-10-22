@@ -54,7 +54,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "security:check": "node scripts/security-check.mjs",
-    "test:sync": "node scripts/sync-test/run.mjs"
+    "test:sync": "node scripts/sync-test/run.mjs",
+    "test:security": "node scripts/security-test/run.mjs"
   },
   "private": true
 }

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { getDb } from './client';
 import type { Order, OrderItem, OrderStatus, Stage, StageEvent } from '../types/models';
-import { assertValidCeNumber, normalizeCeNumber } from '../utils/ceNumber';
+import { assertValidCeNumber, isSafeFolderName, normalizeCeNumber } from '../utils/ceNumber';
 import { DuplicateCeNumberErrorWeb, webOrders } from './webMock';
 import { addTombstones } from './tombstones';
 import { notifyLocalChange } from '../sync/changes';
@@ -472,4 +472,16 @@ export async function updateOrderLogistics(
     id
   );
   notifyLocalChange();
+}
+
+/**
+ * CE numbers saved under older rules that can't be used as a folder name
+ * (e.g. "." or ".."). Nothing is changed or deleted: storage refuses to touch
+ * their folders, and the user can rename them to a real CE number.
+ */
+export async function listUnsafeCeNumbers(): Promise<string[]> {
+  if (isWeb) return [];
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ ceNumber: string }>(`SELECT ceNumber FROM orders`);
+  return rows.map((r) => r.ceNumber).filter((ce) => !isSafeFolderName(ce));
 }
